@@ -11,6 +11,8 @@ repository = "https://github.com/eguidotti/atorch"
 python = "^3.9"
 torch = "^2.6.0"
 
+[tool.poetry.scripts]
+atorch = "atorch.cli:main"
 
 [build-system]
 requires = ["poetry-core"]
