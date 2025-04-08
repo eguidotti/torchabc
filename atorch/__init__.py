@@ -4,7 +4,7 @@ from functools import cached_property
 from types import SimpleNamespace
 from typing import Any, Union, Dict
 
-# For custom data types, you can extend the default collate function with:
+# For custom data types, extend the default collate function with:
 # >>> torch.utils.data.default_collate_fn_map.update({CustomType: collate_customtype_fn})
 # as described at https://pytorch.org/docs/stable/data.html#torch.utils.data._utils.collate.collate
 
@@ -53,54 +53,146 @@ class AbstractTorch(abc.ABC):
         self.hparams = SimpleNamespace(**hparams)
         self.network.to(self.device)
 
-    @cached_property
     @abc.abstractmethod
+    @cached_property
     def network(self) -> torch.nn.Module:
-        """The neural network. Input and output tensors assume batch size as the first dimension."""
+        """The neural network.
+
+        Returns a `torch.nn.Module` whose input and output tensors assume the
+        batch size is the first dimension: (batch_size, ...).
+        """
         pass
 
-    @cached_property
     @abc.abstractmethod
+    @cached_property
     def optimizer(self) -> torch.optim.Optimizer:
-        """The optimizer for training the network."""
+        """The optimizer for training the network.
+
+        Returns a `torch.optim.Optimizer` configured for `self.network.parameters()`.
+        """
         pass
 
-    @cached_property
     @abc.abstractmethod
+    @cached_property
     def train_dataloader(self) -> torch.utils.data.DataLoader:
-        """The DataLoader for the training set."""
+        """The dataloader for the training set.
+
+        Returns a `torch.utils.data.DataLoader` that yields batches of training data.
+        The `Dataset` in the `DataLoader` should call `self.preprocess` to transform the data.
+        """
         pass
 
-    @cached_property
     @abc.abstractmethod
+    @cached_property
     def val_dataloader(self) -> torch.utils.data.DataLoader:
-        """The DataLoader for the validation set."""
+        """The dataloader for the validation set.
+        
+        Returns a `torch.utils.data.DataLoader` that yields batches of validation data.
+        The `Dataset` in the `DataLoader` should call `self.preprocess` to transform the data.
+        """
         pass
 
+    @abc.abstractmethod
     @cached_property
-    @abc.abstractmethod
     def test_dataloader(self) -> torch.utils.data.DataLoader:
-        """The DataLoader for the test set."""
+        """The dataloader for the test set.
+        
+        Returns a `torch.utils.data.DataLoader` that yields batches of test data.
+        The `Dataset` in the `DataLoader` should call `self.preprocess` to transform the data.
+        """
         pass
 
     @abc.abstractmethod
-    def preprocess(self, input: Any, target: Any = None, augment: bool = False) -> Any:
-        """Preprocess the input data and the corresponding target using optional augmentations."""
+    def preprocess(self, input: Any = None, target: Any = None, augment: bool = False) -> Any:
+        """Preprocess the input data and/or the corresponding target using optional augmentations.
+
+        This method is intended to be called within the `transform` function of the `Dataset` 
+        in the train, val, and test dataloaders. It should implement the necessary steps to 
+        prepare the raw `input` data and/or the corresponding `target` for a single sample. 
+        If `augment` is True, this method should also apply data augmentation.
+
+        Parameters
+        ----------
+        input : Any, optional
+            The raw input data for a single sample. Defaults to None.
+        target : Any, optional
+            The target data corresponding to the input. Defaults to None.
+        augment : bool, optional
+            A flag indicating whether to apply data augmentation. Defaults to False.
+
+        Returns
+        -------
+        Any
+            The first of the following: 
+            (1) the preprocessed `input` if `target` is None,
+            (2) the preprocessed `target` if `input` is None,
+            (3) the preprocessed (`input`, `target`) otherwise.
+        """
         pass
 
     @abc.abstractmethod
     def postprocess(self, outputs: torch.Tensor) -> Any:
-        """Postprocess the model's outputs and returns the final predictions."""
+        """Postprocess the model's outputs and returns the final predictions.
+
+        This method takes the neural network `outputs` and transforms it into 
+        the final predictions. 
+
+        Parameters
+        ----------
+        outputs : torch.Tensor
+            The output tensor from `self.network`.
+
+        Returns
+        -------
+        Any
+            The final predictions.
+        """
         pass
 
     @abc.abstractmethod
     def loss(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute the loss between the model's outputs and the corresponding targets."""
+        """Compute the loss between the model's outputs and the corresponding targets.
+
+        This method defines the loss function that quantifies the discrepancy
+        between the neural network `outputs` and the corresponding `targets`. 
+        The loss function should be differentiable to enable backpropagation.
+
+        Parameters
+        ----------
+        outputs : torch.Tensor
+            The tensor containing the network's output.
+        targets : torch.Tensor
+            The targets corresponding to the outputs.
+
+        Returns
+        -------
+        torch.Tensor
+            A scalar tensor representing the computed loss value.
+        """
         pass
 
     @abc.abstractmethod
     def metrics(self, outputs: torch.Tensor, targets: torch.Tensor) -> Dict[str, float]:
-        """Compute evaluation metrics between the model's outputs and the corresponding targets."""
+        """Compute evaluation metrics between the model's outputs and the corresponding targets.
+
+        This method calculates various metrics that quantify the discrepancy
+        between the neural network `outputs` and the corresponding `targets`. 
+        Unlike `self.loss`, which is primarily used for training, these metrics 
+        are only used for evaluation and they do not need to be differentiable.
+
+        Parameters
+        ----------
+        outputs : torch.Tensor
+            The tensor containing the network's output.
+        targets : torch.Tensor
+            The targets corresponding to the outputs.
+
+        Returns
+        -------
+        Dict[str, float]
+            A dictionary where the keys are the names of the metrics and the 
+            values are the corresponding metric scores.
+        """
         pass
 
     def train(self, epochs: int, validate: bool = True) -> None:
