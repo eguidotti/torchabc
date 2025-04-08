@@ -84,7 +84,7 @@ class AbstractTorch(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def preprocess(self, input: Any, target: Any = None, augment: bool = False) -> Any[torch.Tensor]:
+    def preprocess(self, input: Any, target: Any = None, augment: bool = False) -> Any:
         """Preprocess the input data and the corresponding target using optional augmentations."""
         pass
 
