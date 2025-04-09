@@ -10,7 +10,7 @@ class AbstractTorch(abc.ABC):
     An abstract base class for training, evaluation, and inference of pytorch models.
     """
 
-    def __init__(self, device: Union[str, torch.device] = None, logger: Any = None, **hparams):
+    def __init__(self, device: Union[str, torch.device] = None, log: Callable = print, **hparams):
         """Initialize the model.
 
         Parameters
@@ -18,9 +18,8 @@ class AbstractTorch(abc.ABC):
         device : str or torch.device, optional
             The device to use. Defaults to None, which will try CUDA, then MPS, and 
             finally fall back to CPU.
-        logger : Any, optional
-            An optional logger object with a `log` method that accepts a dictionary in 
-            input and logs information. If None, a basic inline logger will be created.
+        log : Callable, optional
+            A logging function that takes a dictionary in input. Defaults to print.
         **hparams :
             Arbitrary keyword arguments that will be stored in the `self.hparams` namespace.
 
@@ -28,8 +27,8 @@ class AbstractTorch(abc.ABC):
         ----------
         device : torch.device
             The device the model will operate on.
-        logger : Any
-            The logger object used for logging.
+        log : Callable
+            The function used for logging.
         hparams : SimpleNamespace
             A namespace containing the hyperparameters.
         epoch : int
@@ -44,10 +43,7 @@ class AbstractTorch(abc.ABC):
             self.device = torch.device("mps")
         else:
             self.device = torch.device("cpu")
-        if logger is not None:
-            self.logger = logger
-        else:
-            self.logger = SimpleNamespace(log=print)
+        self.log = log
         self.hparams = SimpleNamespace(**hparams)
         self.epoch = 0
 
@@ -90,9 +86,9 @@ class AbstractTorch(abc.ABC):
         should correspond to the names of the datasets (e.g., 'train', 'val', 'test'),
         and the values should be their respective `torch.utils.data.DataLoader` objects.
 
-        The transformation of the raw input data for each dataset should be implemented
+        Any transformation of the raw input data for each dataset should be implemented
         within the `preprocess` method of this class. The `preprocess` method should 
-        then be passed as the `transform` argument when creating the `Dataset` instances.
+        then be passed as the `transform` argument of the `Dataset` instances.
 
         If you require custom collation logic (i.e., a specific way to merge a list of
         samples into a batch beyond the default behavior), you should implement this
@@ -103,15 +99,13 @@ class AbstractTorch(abc.ABC):
 
     @abc.abstractmethod
     def preprocess(self, data: Any, flag: str = '') -> Any:
-        """Prepare the raw data for the model.
+        """Prepare the raw data for the network.
 
         The way this method processes the `data` depends on the `flag`.
-
         When `flag` is empty (the default), the `data` are assumed to represent the 
-        model's input that is used for inference. 
-
-        When `flag` has a specific value, the method may perform different preprocessing 
-        steps such as transforming the target or augmenting the input for training.
+        model's input that is used for inference. When `flag` has a specific value, 
+        the method may perform different preprocessing steps such as transforming 
+        the target or augmenting the input for training.
 
         Parameters
         ----------
@@ -132,7 +126,8 @@ class AbstractTorch(abc.ABC):
     def postprocess(self, outputs: torch.Tensor) -> Any:
         """Postprocess the model's outputs.
 
-        This method transforms the outputs of the neural network. 
+        This method transforms the outputs of the neural network to 
+        generate the final predictions. 
 
         Parameters
         ----------
@@ -148,7 +143,7 @@ class AbstractTorch(abc.ABC):
 
     @abc.abstractmethod
     def loss(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute the loss between the model's outputs and the corresponding targets.
+        """Loss function.
 
         This method defines the loss function that quantifies the discrepancy
         between the neural network `outputs` and the corresponding `targets`. 
@@ -170,7 +165,7 @@ class AbstractTorch(abc.ABC):
 
     @abc.abstractmethod
     def metrics(self, outputs: torch.Tensor, targets: torch.Tensor) -> Dict[str, float]:
-        """Compute evaluation metrics between the model's outputs and the corresponding targets.
+        """Evaluation metrics.
 
         This method calculates various metrics that quantify the discrepancy
         between the neural network `outputs` and the corresponding `targets`. 
@@ -293,7 +288,7 @@ class AbstractTorch(abc.ABC):
                     self.optimizer.zero_grad()
                     log_batch.update({"mode": "train", "epoch": epoch, "batch": batch, "loss": loss_gas})
                     log_batch.update(self.metrics(outputs, targets))
-                    self.logger.log(log_batch)
+                    self.log(log_batch)
                     logs.append(log_batch.copy())
                     loss_gas = 0
             if val:
@@ -319,7 +314,7 @@ class AbstractTorch(abc.ABC):
                     self.scheduler.step()
                     log_epoch.update({"lr": self.scheduler.get_last_lr()})
             if log_epoch:
-                self.logger.log(log_epoch)
+                self.log(log_epoch)
                 logs.append(log_epoch.copy())
             if callback:
                 stop = callback(self, logs)
@@ -361,17 +356,17 @@ class AbstractTorch(abc.ABC):
         metrics["loss"] = tot_loss / num_batches
         return metrics
 
-    def predict(self, input: Any) -> Any:
-        """Predict the output for a given input.
+    def predict(self, data: Any) -> Any:
+        """Predict the raw data.
 
         This method sets the network to evaluation mode, preprocesses and
-        collates the input into a batch of size 1, performs a forward pass
+        collates the input data into a batch of size 1, performs a forward pass
         without tracking gradients, and then postprocesses the output to
         return the final prediction.
 
         Parameters
         ----------
-        input : Any
+        data : Any
             The raw input data to predict.
 
         Returns
@@ -382,7 +377,7 @@ class AbstractTorch(abc.ABC):
         self.network.eval()
         self.network.to(self.device)
         with torch.no_grad():
-            preprocessed = self.preprocess(input)
+            preprocessed = self.preprocess(data)
             batch = [preprocessed]
             collated = self.collate(batch)
             inputs = self.move(collated)
