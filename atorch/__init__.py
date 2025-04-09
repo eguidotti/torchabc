@@ -2,7 +2,7 @@ import abc
 import torch
 from functools import cached_property
 from types import SimpleNamespace
-from typing import Any, Union, Dict, Callable
+from typing import Any, Union, Dict, List, Callable
 
 
 class AbstractTorch(abc.ABC):
@@ -32,6 +32,8 @@ class AbstractTorch(abc.ABC):
             The logger object used for logging.
         hparams : SimpleNamespace
             A namespace containing the hyperparameters.
+        epoch : int
+            The last epoch seen during training.
         """
         super().__init__()
         if device is not None:
@@ -47,6 +49,7 @@ class AbstractTorch(abc.ABC):
         else:
             self.logger = SimpleNamespace(log=print)
         self.hparams = SimpleNamespace(**hparams)
+        self.epoch = 0
 
     @abc.abstractmethod
     @cached_property
@@ -64,6 +67,16 @@ class AbstractTorch(abc.ABC):
         """The optimizer for training the network.
 
         Returns a `torch.optim.Optimizer` configured for `self.network.parameters()`.
+        """
+        pass
+
+    @abc.abstractmethod
+    @cached_property
+    def scheduler(self) -> Union[None, torch.optim.lr_scheduler.LRScheduler, torch.optim.lr_scheduler.ReduceLROnPlateau]:
+        """The learning rate scheduler for the optimizer.
+
+        Returns a `torch.optim.lr_scheduler.LRScheduler` or `torch.optim.lr_scheduler.ReduceLROnPlateau`
+        configured for `self.optimizer`.
         """
         pass
 
@@ -229,7 +242,7 @@ class AbstractTorch(abc.ABC):
                 "Please implement the move method for custom data types."
             )
 
-    def train(self, epochs: int, on: str = 'train', val: str = 'val', callback: Callable = None, log: dict = None) -> None:
+    def train(self, epochs: int, on: str = 'train', val: str = 'val', log: dict = None, callback: Callable = None) -> List[dict]:
         """Train the model.
 
         This method sets the network to training mode, iterates through the
@@ -246,15 +259,21 @@ class AbstractTorch(abc.ABC):
             The name of the training dataloader. Defaults to 'train'.
         val : str, optional
             The name of the validation dataloader. Defaults to 'val'.
+        log : dict, optional
+            A dictionary of additional information to log. 
         callback : Callable, optional
             A callback function that is called after each epoch. It should
             accept the current instance and the logs as arguments. If it returns
             True, training will stop.
-        log : dict, optional
-            A dictionary of additional information to log. 
+        
+        Returns
+        -------
+        list
+            A list of dictionaries containing the logs for each batch and epoch.
         """
         logs, log_batch, log_epoch = ([], {}, {}) if log is None else ([], log.copy(), log.copy())
-        for epoch in range(1, epochs + 1):
+        for epoch in range(self.epoch + 1, self.epoch + 1 + epochs):
+            self.epoch = epoch
             self.network.train()
             self.network.to(self.device)
             for batch, (inputs, targets) in enumerate(self.dataloaders[on]):
@@ -267,19 +286,43 @@ class AbstractTorch(abc.ABC):
                 log_batch.update({"mode": "train", "epoch": epoch, "batch": batch, "loss": loss.item()})
                 log_batch.update(self.metrics(outputs, targets))
                 self.logger.log(log_batch)
+                logs.append(log_batch)
             if val:
                 log_epoch.update({"epoch": epoch})
-                logs.append(self.eval(on=val, log=log_epoch))
+                log_epoch.update(self.eval(on=val))
+            if self.scheduler:
+                if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                    if not val:
+                        raise ValueError(
+                            "ReduceLROnPlateau scheduler requires validation metrics. "
+                            "Please provide a validation dataloader. "
+                        )
+                    if not hasattr(self.hparams, "plateau"):
+                        raise ValueError(
+                            "ReduceLROnPlateau scheduler requires a metric to monitor. "
+                            "Please specify the metric name during initialization by "
+                            f"using {self.__class__.__name__}(plateau='name'), "
+                            "where 'name' is either 'loss' or a key returned by `self.metrics`."
+                        )
+                    self.scheduler.step(log_epoch[self.hparams.plateau])
+                    log_epoch.update({"lr": self.scheduler.get_last_lr()})
+                else:
+                    self.scheduler.step()
+                    log_epoch.update({"lr": self.scheduler.get_last_lr()})
+            if log_epoch:
+                self.logger.log(log_epoch)
+                logs.append(log_epoch)
             if callback:
                 stop = callback(self, logs)
                 if stop:
                     break
+        return logs
 
-    def eval(self, on: str, log: dict = None) -> None:
+    def eval(self, on: str) -> Dict[str, float]:
         """Evaluate the model.
 
         This method sets the network to evaluation mode, iterates through the
-        given dataloader, calculates the loss and metrics, and logs and returns 
+        given dataloader, calculates the loss and metrics, and returns 
         the results. No gradients are computed during this process.
 
         Parameters
@@ -287,13 +330,11 @@ class AbstractTorch(abc.ABC):
         on : str
             The name of the dataloader to evaluate on. This should be one of
             the keys in `self.dataloaders`.
-        log : dict, optional
-            A dictionary of additional information to log. 
 
         Returns
         -------
         dict
-            A dictionary containing the evaluation results.
+            A dictionary containing the loss and evaluation metrics.
         """
         self.network.eval()
         tot_loss, num_batches = 0, 0
@@ -307,11 +348,9 @@ class AbstractTorch(abc.ABC):
                 all_outputs.append(outputs)
                 all_targets.append(targets)
                 num_batches += 1
-        log = {} if log is None else log.copy()
-        log.update({"mode": "eval", "loss": tot_loss / num_batches})
-        log.update(self.metrics(torch.cat(all_outputs), torch.cat(all_targets)))
-        self.logger.log(log)
-        return log
+        metrics = self.metrics(torch.cat(all_outputs), torch.cat(all_targets))
+        metrics["loss"] = tot_loss / num_batches
+        return metrics
 
     def predict(self, input: Any) -> Any:
         """Predict the output for a given input.
@@ -342,30 +381,35 @@ class AbstractTorch(abc.ABC):
             predictions = self.postprocess(outputs)
         return predictions[0]
 
-    def save(self, filepath: str) -> None:
-        """Save the the model's and optimizer's state dictionaries.
+    def save(self, checkpoint: str) -> None:
+        """Save checkpoint.
 
         Parameters
         ----------
-        filepath : str
-            The path to save the model's and optimizer's state dictionaries to.
+        checkpoint : str
+            The path where to save the checkpoint.
         """
         torch.save({
+            'hparams': self.hparams.__dict__,
+            'epoch': self.epoch,
             'network_state_dict': self.network.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-        }, filepath)
+            'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
+            
+        }, checkpoint)
 
-    def load(self, filepath: str) -> None:
-        """Load the model's and optimizer's state dictionaries.
+    def load(self, checkpoint: str) -> None:
+        """Load checkpoint.
 
         Parameters
         ----------
-        filepath : str
-            The path from which to load the model's and optimizer's state
-            dictionaries. The loaded tensors will be mapped to the current
-            device.
+        checkpoint : str
+            The path from where to load the checkpoint.
         """
-        checkpoint = torch.load(filepath, map_location=self.device)
+        checkpoint = torch.load(checkpoint, map_location=self.device)
+        self.hparams = SimpleNamespace(**checkpoint['hparams'])
+        self.epoch = checkpoint['epoch']
         self.network.load_state_dict(checkpoint['network_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        
+        if checkpoint['scheduler_state_dict']:
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])

@@ -13,6 +13,7 @@ def main():
     cached_properties = {}
     methods = {}
     defaults = {
+        'scheduler': 'return None',
         'metrics': 'return {}',
         'postprocess': 'return outputs',
         'preprocess': 'return data',
@@ -49,7 +50,7 @@ class ClassName(AbstractTorch):"""
     template += """
     """
 
-    for name in ('dataloaders', 'preprocess', 'network', 'optimizer', 'loss', 'metrics', 'postprocess'):
+    for name in ('dataloaders', 'preprocess', 'network', 'optimizer', 'scheduler', 'loss', 'metrics', 'postprocess'):
         if name in cached_properties:
             doc = cached_properties[name]
             template += f"""
@@ -59,7 +60,7 @@ class ClassName(AbstractTorch):"""
                 template += f"""
         \"\"\"{doc}\"\"\""""
             template += f"""
-        raise NotImplementedError
+        {defaults[name] if name in defaults else 'raise NotImplementedError'}
     """
         elif name in methods:
             sig, doc = methods[name]

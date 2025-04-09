@@ -107,7 +107,16 @@ class MNISTClassifier(AbstractTorch):
         Returns a `torch.optim.Optimizer` configured for `self.network.parameters()`.
         """
         return torch.optim.Adam(self.network.parameters(), lr=self.hparams.lr)
-        
+    
+    @cached_property
+    def scheduler(self):
+        """The learning rate scheduler for the optimizer.
+
+        Returns a `torch.optim.lr_scheduler.LRScheduler` or `torch.optim.lr_scheduler.ReduceLROnPlateau`
+        configured for `self.optimizer`.
+        """
+        return None
+
     def loss(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """Compute the loss between the model's outputs and the corresponding targets.
 
@@ -184,12 +193,12 @@ if __name__ == "__main__":
     
     # evaluate the model
     print("Model evaluation at the end of training:")
-    model.eval(on='val')
+    print(model.eval(on='val'))
     
     # load checkpoint and evaluate the model
     print("Model evaluation at the end of the first epoch:")
     model.load("epoch_1.pth")
-    model.eval(on='val')
+    print(model.eval(on='val'))
 
     # inference from raw data
     print("Model inference from raw data:")
