@@ -6,11 +6,17 @@ from . import AbstractTorch
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a template implementing AbstractTorch.")
-    parser.add_argument('--path', type=str, required=True, help='The path to save the generated template file.')
+    parser.add_argument('--file', type=str, required=True, help='The path to save the generated template file.')
+    parser.add_argument('--minimal', action='store_true', help='Generate a minimal template without docstrings.')
     args = parser.parse_args()
 
-    methods = {}
     cached_properties = {}
+    methods = {}
+    defaults = {
+        'metrics': 'return {}',
+        'postprocess': 'return outputs',
+        'preprocess': 'return data',
+    }
 
     for name, member in inspect.getmembers(AbstractTorch):
         if hasattr(member, '__isabstractmethod__'):
@@ -24,10 +30,13 @@ def main():
 import torch
 from atorch import AbstractTorch
 from functools import cached_property
-from typing import Any, Dict, Callable
+from typing import Any, Dict
 
 
-class ClassName(AbstractTorch):
+class ClassName(AbstractTorch):"""
+
+    if not args.minimal:
+        template += """
     \"\"\"A concrete implementation of the AbstractTorch base class.
 
     Use this template to implement your own model by following these steps:
@@ -35,33 +44,36 @@ class ClassName(AbstractTorch):
     - replace this docstring with a description of your model,
     - implement the methods below to define the core logic of your model,
     - access the hyperparameters passed during initialization with `self.hparams`.
-    \"\"\"
-"""
-
-    defaults = {
-        'metrics': 'return {}',
-        'postprocess': 'return outputs',
-        'preprocess': 'return data',
-    }
+    \"\"\""""
     
+    template += """
+    """
+
     for name in ('dataloaders', 'preprocess', 'network', 'optimizer', 'loss', 'metrics', 'postprocess'):
         if name in cached_properties:
             doc = cached_properties[name]
             template += f"""
     @cached_property
-    def {name}(self):
-        \"\"\"{doc}\"\"\"
+    def {name}(self):"""
+            if not args.minimal:
+                template += f"""
+        \"\"\"{doc}\"\"\""""
+            template += f"""
         raise NotImplementedError
     """
         elif name in methods:
             sig, doc = methods[name]
             template += f"""
-    def {name}{sig}:
-        \"\"\"{doc}\"\"\"
+    def {name}{sig}:"""
+            if not args.minimal:
+                template += f"""
+        \"\"\"{doc}\"\"\""""
+            template += f"""
         {defaults[name] if name in defaults else 'raise NotImplementedError'}
     """
     
-    template += f"""
+    if not args.minimal:
+        template += f"""
 
 if __name__ == "__main__":
     # Example usage
@@ -69,10 +81,10 @@ if __name__ == "__main__":
     model.train(epochs=1)
 """
 
-    with open(args.path, "x") as f:
+    with open(args.file, "x") as f:
         f.write(template.lstrip())
         
-    print(f"Template generated at: {args.path}")
+    print(f"Template generated at: {args.file}")
 
 if __name__ == "__main__":
     main()
