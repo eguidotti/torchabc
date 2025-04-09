@@ -281,14 +281,14 @@ class AbstractTorch(abc.ABC):
             self.network.to(self.device)
             self.optimizer.zero_grad()
             loss_gas = 0
-            for batch, (inputs, targets) in enumerate(self.dataloaders[on]):
+            for batch, (inputs, targets) in enumerate(self.dataloaders[on], start=1):
                 inputs, targets = self.move((inputs, targets))
                 outputs = self.network(inputs)
                 loss = self.loss(outputs, targets)
                 loss = loss / gas
                 loss.backward()
                 loss_gas += loss.item()
-                if (batch + 1) % gas == 0:
+                if batch % gas == 0:
                     self.optimizer.step()
                     self.optimizer.zero_grad()
                     log_batch.update({"mode": "train", "epoch": epoch, "batch": batch, "loss": loss_gas})
