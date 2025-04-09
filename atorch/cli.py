@@ -71,7 +71,7 @@ if __name__ == "__main__":
 """
 
     with open(args.path, "x") as f:
-        f.write(template)
+        f.write(template.lstrip())
         
     print(f"Template generated at: {args.path}")
 
