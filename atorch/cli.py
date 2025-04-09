@@ -13,7 +13,7 @@ def main():
     cached_properties = {}
 
     for name, member in inspect.getmembers(AbstractTorch):
-        if hasattr(member, '__isabstractmethod__') or name in ('collate', 'move'):
+        if hasattr(member, '__isabstractmethod__'):
             if isinstance(AbstractTorch.__dict__.get(name), cached_property):
                 cached_properties[name] = member.__doc__ or ""
             elif callable(member):
@@ -37,27 +37,26 @@ class ClassName(AbstractTorch):
     - access the hyperparameters passed during initialization with `self.hparams`.
     \"\"\"
 """
+
+    defaults = {
+        'metrics': 'return {}',
+        'postprocess': 'return outputs',
+        'preprocess': 'return data',
+    }
     
-    for name, doc in cached_properties.items():
-        template += f"""
+    for name in ('dataloaders', 'preprocess', 'network', 'optimizer', 'loss', 'metrics', 'postprocess'):
+        if name in cached_properties:
+            doc = cached_properties[name]
+            template += f"""
     @cached_property
     def {name}(self):
         \"\"\"{doc}\"\"\"
         raise NotImplementedError
     """
-
-    defaults = {
-        'metrics': 'return {}',
-        'postprocess': 'return outputs',
-        'preprocess': 'return input if target is None else target if input is None else (input, target)',
-        'collate': 'return super().collate(batch)',
-        'move': 'return super().move(data)',
-    }
-
-    for name, (sig, doc) in methods.items():
-        signature_str = str(sig)
-        template += f"""
-    def {name}{signature_str}:
+        elif name in methods:
+            sig, doc = methods[name]
+            template += f"""
+    def {name}{sig}:
         \"\"\"{doc}\"\"\"
         {defaults[name] if name in defaults else 'raise NotImplementedError'}
     """
