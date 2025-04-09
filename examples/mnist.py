@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
     # inference from raw data
     print("Model inference from raw data:")
-    model.dataloaders['val'].dataset.transform = None    # disable transform
-    input, target = model.dataloaders['val'].dataset[0]  # read PIL image and label
-    prediction = model.predict(input)                    # predict from PIL image    
-    print(f"Prediction {prediction} | Target {target}")  # print results
+    model.dataloaders['val'].dataset.transform = None     # disable transform
+    data = model.dataloaders['val'].dataset[0]            # read PIL image and label
+    prediction = model.predict(data[0])                   # predict from PIL image    
+    print(f"Prediction {prediction} | Target {data[1]}")  # print results
