@@ -13,19 +13,13 @@ This package depends on [`torch`](https://pypi.org/project/torch/) only.
 
 ## Quick start
 
-Generate the full template using the command line interface.
+Generate a template using the command line interface.
 
 ```bash
 atorch --create template.py
 ```
 
-You can also generate a minimal template without docstrings.
-
-```bash
-atorch --create template.py --minimal
-```
-
-The (minimal) template is structured as follows.
+The template is structured as follows.
 
 ```py
 class ClassName(AbstractTorch):
