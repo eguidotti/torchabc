@@ -10,22 +10,7 @@ from typing import Any, Dict
 
 
 class MNISTClassifier(AbstractTorch):
-    """A simple convolutional neural network for classifying MNIST digits.
-
-    This model takes grayscale images of handwritten digits (0-9) from the
-    MNIST dataset as input and predicts the digit class. 
-
-    The raw MNIST dataset provides images as PIL Image objects with pixel
-    values ranging from 0 to 255. The preprocessing steps convert these
-    images to PyTorch tensors and normalize the pixel values.
-
-    The postprocessing step involves taking the argmax of the network's output
-    logits to obtain the final predicted digit class.
-
-    Hyperparameters such as learning rate, batch size, and the number of
-    data loader workers can be configured during initialization and accessed 
-    with  `self.hparams`.
-    """
+    """A simple convolutional neural network for classifying MNIST digits."""
 
     @cached_property
     def dataloaders(self):
@@ -61,6 +46,40 @@ class MNISTClassifier(AbstractTorch):
         )
         return {'train': train_dataloder, 'val': val_dataloder}
     
+    def preprocess(self, data: Any, flag: str = '') -> Any:
+        """Prepare the raw data for the model.
+
+        The way this method processes the `data` depends on the `flag`.
+
+        When `flag` is empty (the default), the `data` are assumed to represent the 
+        model's input that is used for inference. 
+
+        When `flag` has a specific value, the method may perform different preprocessing 
+        steps such as transforming the target or augmenting the input for training.
+
+        Parameters
+        ----------
+        data : Any
+            The raw input data to be processed.
+        flag : str, optional
+            A string indicating the purpose of the preprocessing. The default
+            is an empty string, meaning preprocess the model's input for inference.
+
+        Returns
+        -------
+        Any
+            The preprocessed data.
+        """
+        transform = T.Compose([
+            T.ToTensor(),
+            T.Normalize((0.1307,), (0.3081,)),
+            T.RandomPerspective(
+                p=0.5 if flag == 'augment' else 0,
+                distortion_scale=0.1
+            )
+        ])  
+        return transform(data)
+    
     @cached_property
     def network(self):
         """The neural network.
@@ -88,26 +107,7 @@ class MNISTClassifier(AbstractTorch):
         Returns a `torch.optim.Optimizer` configured for `self.network.parameters()`.
         """
         return torch.optim.Adam(self.network.parameters(), lr=self.hparams.lr)
-    
-    def collate(self, batch: Any) -> Any:
-        """Collate a batch of data.
-
-        This method applies the `torch.utils.data.default_collate` function, which is 
-        used as the default function for collation in dataloaders. For custom data types, 
-        overwrite this function and pass it as the `collate_fn` argument to the dataloader.
-
-        Parameters
-        ----------
-        batch : Any
-            The batch of data to collate.
-
-        Returns
-        -------
-        Any
-            The collated batch of data.
-        """
-        return super().collate(batch)
-    
+        
     def loss(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """Compute the loss between the model's outputs and the corresponding targets.
 
@@ -152,26 +152,7 @@ class MNISTClassifier(AbstractTorch):
         """
         accuracy = (torch.argmax(outputs, dim=1) == targets).float().mean().item()
         return {"accuracy": accuracy}
-    
-    def move(self, data: Any) -> Any:
-        """Move data to the current device.
-
-        This method moves the data to the device specified by `self.device`. It supports 
-        moving tensors, lists, tuples, and dictionaries. For custom data types, overwrite 
-        this function to implement the necessary logic for moving the data to the device.
-
-        Parameters
-        ----------
-        data : Any
-            The data to move to the current device.
-
-        Returns
-        -------
-        Any
-            The data moved to the current device.
-        """
-        return super().move(data)
-    
+        
     def postprocess(self, outputs: torch.Tensor) -> Any:
         """Postprocess the model's outputs.
 
@@ -188,40 +169,6 @@ class MNISTClassifier(AbstractTorch):
             The postprocessed outputs.
         """
         return torch.argmax(outputs, dim=1).cpu().numpy()
-    
-    def preprocess(self, data: Any, flag: str = '') -> Any:
-        """Prepare the raw data for the model.
-
-        The way this method processes the `data` depends on the `flag`.
-
-        When `flag` is empty (the default), the `data` are assumed to represent the 
-        model's input that is used for inference. 
-
-        When `flag` has a specific value, the method may perform different preprocessing 
-        steps such as transforming the target or augmenting the input for training.
-
-        Parameters
-        ----------
-        data : Any
-            The raw input data to be processed.
-        flag : str, optional
-            A string indicating the purpose of the preprocessing. The default
-            is an empty string, meaning preprocess the model's input for inference.
-
-        Returns
-        -------
-        Any
-            The preprocessed data.
-        """
-        transform = T.Compose([
-            T.ToTensor(),
-            T.Normalize((0.1307,), (0.3081,)),
-            T.RandomPerspective(
-                p=0.5 if flag == 'augment' else 0,
-                distortion_scale=0.1
-            )
-        ])  
-        return transform(data)
     
 
 if __name__ == "__main__":
