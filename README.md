@@ -111,7 +111,6 @@ model.train(
     on: str = 'train', 
     val: str = 'val', 
     gas: int = 1, 
-    log: dict = None, 
     callback: Callable = None
 )
 ```
@@ -122,10 +121,9 @@ where
 - `on` is the name of the training dataloader. Defaults to 'train'.
 - `val` is the name of the validation dataloader. Defaults to 'val'.
 - `gas` is the number of gradient accumulation steps. Defaults to 1 (no gradient accumulation).
-- `log` is a dictionary of additional information to log. 
-- `callback` is a function that is called after each epoch. It should accept two arguments: the instance itself and a list of logs. If the callback returns `True`, training stops.
+- `callback` is a function that is called after each epoch. It should accept two arguments: the instance itself and a list of dictionaries containing the loss and evaluation metrics. When this function returns `True`, training stops.
 
-This method returns the training/validation metrics for each batch and at the end of each epoch.
+This method returns a list of dictionaries containing the loss and evaluation metrics.
 
 ### Checkpoints
 
