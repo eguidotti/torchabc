@@ -178,3 +178,4 @@ cython_debug/
 poetry.lock
 data
 assets
+wandb
