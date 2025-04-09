@@ -24,7 +24,7 @@ def main():
 import torch
 from atorch import AbstractTorch
 from functools import cached_property
-from typing import Any, Dict
+from typing import Any, Dict, Callable
 
 
 class ClassName(AbstractTorch):

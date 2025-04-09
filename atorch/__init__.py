@@ -2,7 +2,7 @@ import abc
 import torch
 from functools import cached_property
 from types import SimpleNamespace
-from typing import Any, Union, Dict
+from typing import Any, Union, Dict, Callable
 
 
 class AbstractTorch(abc.ABC):
@@ -19,8 +19,8 @@ class AbstractTorch(abc.ABC):
             The device to use. Defaults to None, which will try CUDA, then MPS, and 
             finally fall back to CPU.
         logger : Any, optional
-            An optional logger object with a `log(dict)` method for logging information. 
-            If None, a basic inline logger will be created.
+            An optional logger object with a `log` method that accepts a dictionary in 
+            input and logs information. If None, a basic inline logger will be created.
         **hparams :
             Arbitrary keyword arguments that will be stored in the `self.hparams` namespace.
 
@@ -229,7 +229,7 @@ class AbstractTorch(abc.ABC):
                 "Please implement the move method for custom data types."
             )
 
-    def train(self, epochs: int, on: str = 'train', val: str = 'val') -> None:
+    def train(self, epochs: int, on: str = 'train', val: str = 'val', callback: Callable = None, log: dict = None) -> None:
         """Train the model.
 
         This method sets the network to training mode, iterates through the
@@ -246,7 +246,14 @@ class AbstractTorch(abc.ABC):
             The name of the training dataloader. Defaults to 'train'.
         val : str, optional
             The name of the validation dataloader. Defaults to 'val'.
+        callback : Callable, optional
+            A callback function that is called after each epoch. It should
+            accept the current instance and the logs as arguments. If it returns
+            True, training will stop.
+        log : dict, optional
+            A dictionary of additional information to log. 
         """
+        logs, log_batch, log_epoch = ([], {}, {}) if log is None else ([], log.copy(), log.copy())
         for epoch in range(1, epochs + 1):
             self.network.train()
             self.network.to(self.device)
@@ -257,19 +264,36 @@ class AbstractTorch(abc.ABC):
                 loss = self.loss(outputs, targets)
                 loss.backward()
                 self.optimizer.step()
-                info = {"epoch": epoch, "batch": batch, "train/loss": loss.item()}
-                metrics = self.metrics(outputs, targets)
-                info.update({"train/" + key: val for key, val in metrics.items()})
-                self.logger.log(info)
+                log_batch.update({"mode": "train", "epoch": epoch, "batch": batch, "loss": loss.item()})
+                log_batch.update(self.metrics(outputs, targets))
+                self.logger.log(log_batch)
             if val:
-                self.eval(on=val)
+                log_epoch.update({"epoch": epoch})
+                logs.append(self.eval(on=val, log=log_epoch))
+            if callback:
+                stop = callback(self, logs)
+                if stop:
+                    break
 
-    def eval(self, on: str) -> None:
+    def eval(self, on: str, log: dict = None) -> None:
         """Evaluate the model.
 
         This method sets the network to evaluation mode, iterates through the
-        given dataloader, calculates the loss and metrics, and logs the
-        results. No gradients are computed during this process.
+        given dataloader, calculates the loss and metrics, and logs and returns 
+        the results. No gradients are computed during this process.
+
+        Parameters
+        ----------
+        on : str
+            The name of the dataloader to evaluate on. This should be one of
+            the keys in `self.dataloaders`.
+        log : dict, optional
+            A dictionary of additional information to log. 
+
+        Returns
+        -------
+        dict
+            A dictionary containing the evaluation results.
         """
         self.network.eval()
         tot_loss, num_batches = 0, 0
@@ -279,15 +303,15 @@ class AbstractTorch(abc.ABC):
             for inputs, targets in self.dataloaders[on]:
                 inputs, targets = self.move((inputs, targets))
                 outputs = self.network(inputs)
-                tot_loss += self.loss(outputs, targets)
+                tot_loss += self.loss(outputs, targets).item()
                 all_outputs.append(outputs)
                 all_targets.append(targets)
                 num_batches += 1
-        loss = tot_loss / num_batches
-        info = {"val/loss": loss.item()}
-        metrics = self.metrics(torch.cat(all_outputs), torch.cat(all_targets))
-        info.update({"val/" + key: val for key, val in metrics.items()})
-        self.logger.log(info)
+        log = {} if log is None else log.copy()
+        log.update({"mode": "eval", "loss": tot_loss / num_batches})
+        log.update(self.metrics(torch.cat(all_outputs), torch.cat(all_targets)))
+        self.logger.log(log)
+        return log
 
     def predict(self, input: Any) -> Any:
         """Predict the output for a given input.
