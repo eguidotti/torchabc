@@ -242,7 +242,8 @@ class AbstractTorch(abc.ABC):
                 "Please implement the move method for custom data types."
             )
 
-    def train(self, epochs: int, on: str = 'train', val: str = 'val', log: dict = None, callback: Callable = None) -> List[dict]:
+    def train(self, epochs: int, on: str = 'train', val: str = 'val', gas: int = 1, 
+              log: dict = None, callback: Callable = None) -> List[dict]:
         """Train the model.
 
         This method sets the network to training mode, iterates through the
@@ -259,6 +260,8 @@ class AbstractTorch(abc.ABC):
             The name of the training dataloader. Defaults to 'train'.
         val : str, optional
             The name of the validation dataloader. Defaults to 'val'.
+        gas : int, optional
+            The number of gradient accumulation steps. Defaults to 1 (no gradient accumulation).
         log : dict, optional
             A dictionary of additional information to log. 
         callback : Callable, optional
@@ -276,17 +279,23 @@ class AbstractTorch(abc.ABC):
             self.epoch = epoch
             self.network.train()
             self.network.to(self.device)
+            self.optimizer.zero_grad()
+            loss_gas = 0
             for batch, (inputs, targets) in enumerate(self.dataloaders[on]):
                 inputs, targets = self.move((inputs, targets))
-                self.optimizer.zero_grad()
                 outputs = self.network(inputs)
                 loss = self.loss(outputs, targets)
+                loss = loss / gas
                 loss.backward()
-                self.optimizer.step()
-                log_batch.update({"mode": "train", "epoch": epoch, "batch": batch, "loss": loss.item()})
-                log_batch.update(self.metrics(outputs, targets))
-                self.logger.log(log_batch)
-                logs.append(log_batch)
+                loss_gas += loss.item()
+                if (batch + 1) % gas == 0:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+                    log_batch.update({"mode": "train", "epoch": epoch, "batch": batch, "loss": loss_gas})
+                    log_batch.update(self.metrics(outputs, targets))
+                    self.logger.log(log_batch)
+                    logs.append(log_batch.copy())
+                    loss_gas = 0
             if val:
                 log_epoch.update({"epoch": epoch})
                 log_epoch.update(self.eval(on=val))
@@ -311,7 +320,7 @@ class AbstractTorch(abc.ABC):
                     log_epoch.update({"lr": self.scheduler.get_last_lr()})
             if log_epoch:
                 self.logger.log(log_epoch)
-                logs.append(log_epoch)
+                logs.append(log_epoch.copy())
             if callback:
                 stop = callback(self, logs)
                 if stop:
