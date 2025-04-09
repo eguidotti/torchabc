@@ -176,3 +176,4 @@ cython_debug/
 # Extra
 .DS_Store
 poetry.lock
+data
