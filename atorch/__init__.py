@@ -237,15 +237,13 @@ class AbstractTorch(abc.ABC):
                 "Please implement the move method for custom data types."
             )
 
-    def train(self, epochs: int, on: str = 'train', val: str = 'val', gas: int = 1, 
-              log: dict = None, callback: Callable = None) -> List[dict]:
+    def train(self, epochs: int, on: str = 'train', val: str = 'val', gas: int = 1, callback: Callable = None) -> List[dict]:
         """Train the model.
 
-        This method sets the network to training mode, iterates through the
-        training dataloader for the given number of epochs, performs forward
-        and backward passes, optimizes the model parameters, and logs the
-        training loss and metrics. It optionally performs validation after each
-        epoch.
+        This method sets the network to training mode, iterates through the training dataloader 
+        for the given number of epochs, performs forward and backward passes, optimizes the 
+        model parameters, and logs the training loss and metrics. It optionally performs validation 
+        after each epoch.
         
         Parameters
         ----------
@@ -257,18 +255,17 @@ class AbstractTorch(abc.ABC):
             The name of the validation dataloader. Defaults to 'val'.
         gas : int, optional
             The number of gradient accumulation steps. Defaults to 1 (no gradient accumulation).
-        log : dict, optional
-            A dictionary of additional information to log. 
         callback : Callable, optional
             A callback function that is called after each epoch. It should accept two arguments:
-            the instance itself and a list of logs. If the callback returns True, training stops.
+            the instance itself and a list of dictionaries containing the loss and evaluation metrics.
+            When this function returns True, training stops.
         
         Returns
         -------
         list
-            A list of dictionaries containing the logs.
+            A list of dictionaries containing the loss and evaluation metrics.
         """
-        logs, log_batch, log_epoch = ([], {}, {}) if log is None else ([], log.copy(), log.copy())
+        logs, log_batch, log_epoch = [], {}, {}
         for epoch in range(self.epoch + 1, self.epoch + 1 + epochs):
             self.epoch = epoch
             self.network.train()
@@ -285,14 +282,14 @@ class AbstractTorch(abc.ABC):
                 if batch % gas == 0:
                     self.optimizer.step()
                     self.optimizer.zero_grad()
-                    log_batch.update({"mode": "train", "epoch": epoch, "batch": batch, "loss": loss_gas})
-                    log_batch.update(self.metrics(outputs, targets))
+                    log_batch.update({on + "/epoch": epoch, on + "/batch": batch, on + "/loss": loss_gas})
+                    log_batch.update({on + "/" + k: v for k, v in self.metrics(outputs, targets).items()})
                     self.logger(log_batch)
                     logs.append(log_batch.copy())
                     loss_gas = 0
             if val:
-                log_epoch.update({"epoch": epoch})
-                log_epoch.update(self.eval(on=val))
+                log_epoch.update({val + "/epoch": epoch})
+                log_epoch.update({val + "/" + k: v for k, v in self.eval(on=val).items()})
             if self.scheduler:
                 if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                     if not val:
@@ -307,11 +304,11 @@ class AbstractTorch(abc.ABC):
                             f"using {self.__class__.__name__}(plateau='name'), "
                             "where 'name' is either 'loss' or a key returned by `self.metrics`."
                         )
-                    self.scheduler.step(log_epoch[self.hparams.plateau])
-                    log_epoch.update({"lr": self.scheduler.get_last_lr()})
+                    self.scheduler.step(log_epoch[val + "/" + self.hparams.plateau])
+                    log_epoch.update({val + "/lr": self.scheduler.get_last_lr()})
                 else:
                     self.scheduler.step()
-                    log_epoch.update({"lr": self.scheduler.get_last_lr()})
+                    log_epoch.update({val + "/lr": self.scheduler.get_last_lr()})
             if log_epoch:
                 self.logger(log_epoch)
                 logs.append(log_epoch.copy())
