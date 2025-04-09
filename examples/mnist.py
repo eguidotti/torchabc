@@ -172,14 +172,28 @@ class MNISTClassifier(AbstractTorch):
     
 
 if __name__ == "__main__":
-    # initialize
+
+    # initialize the model
     model = MNISTClassifier(lr=0.001, batch_size=64, num_workers=4)
-    # train
-    model.train(epochs=5)
+    
+    # a simple callback to save the model after each epoch
+    callback = lambda self, logs: self.save(f"epoch_{logs[-1]['epoch']}.pth")  
+
+    # train the model
+    model.train(epochs=3, callback=callback)
+    
+    # evaluate the model
+    print("Model evaluation at the end of training:")
+    model.eval(on='val')
+    
+    # load checkpoint and evaluate the model
+    print("Model evaluation at the end of the first epoch:")
+    model.load("epoch_1.pth")
+    model.eval(on='val')
+
     # inference from raw data
+    print("Model inference from raw data:")
     model.dataloaders['val'].dataset.transform = None    # disable transform
     input, target = model.dataloaders['val'].dataset[0]  # read PIL image and label
-    prediction = model.predict(input)                    # predict from PIL image
-    # print results
-    print("Target:", target)
-    print("Prediction:", prediction)
+    prediction = model.predict(input)                    # predict from PIL image    
+    print(f"Prediction {prediction} | Target {target}")  # print results
