@@ -4,10 +4,6 @@ from functools import cached_property
 from types import SimpleNamespace
 from typing import Any, Union, Dict
 
-# For custom data types, extend the default collate function with:
-# >>> torch.utils.data.default_collate_fn_map.update({CustomType: collate_customtype_fn})
-# as described at https://pytorch.org/docs/stable/data.html#torch.utils.data._utils.collate.collate
-
 
 class AbstractTorch(abc.ABC):
     """
@@ -51,7 +47,6 @@ class AbstractTorch(abc.ABC):
         else:
             self.logger = SimpleNamespace(log=print)
         self.hparams = SimpleNamespace(**hparams)
-        self.network.to(self.device)
 
     @abc.abstractmethod
     @cached_property
@@ -74,68 +69,57 @@ class AbstractTorch(abc.ABC):
 
     @abc.abstractmethod
     @cached_property
-    def train_dataloader(self) -> torch.utils.data.DataLoader:
-        """The dataloader for the training set.
+    def dataloaders(self) -> Dict[str, torch.utils.data.DataLoader]:
+        """The dataloaders for training and evaluation.
 
-        Returns a `torch.utils.data.DataLoader` that yields batches of training data.
-        The `Dataset` in the `DataLoader` should call `self.preprocess` to transform the data.
+        This method defines and returns a dictionary containing the `DataLoader` instances
+        for the training, validation, and testing datasets. The keys of the dictionary
+        should correspond to the names of the datasets (e.g., 'train', 'val', 'test'),
+        and the values should be their respective `torch.utils.data.DataLoader` objects.
+
+        The transformation of the raw input data for each dataset should be implemented
+        within the `preprocess` method of this class. The `preprocess` method should 
+        then be passed as the `transform` argument when creating the `Dataset` instances.
+
+        If you require custom collation logic (i.e., a specific way to merge a list of
+        samples into a batch beyond the default behavior), you should implement this
+        logic in the `collate` method of this class. The `collate` method should then be 
+        passed to the `collate_fn` argument when creating the `DataLoader` instances. 
         """
         pass
 
     @abc.abstractmethod
-    @cached_property
-    def val_dataloader(self) -> torch.utils.data.DataLoader:
-        """The dataloader for the validation set.
-        
-        Returns a `torch.utils.data.DataLoader` that yields batches of validation data.
-        The `Dataset` in the `DataLoader` should call `self.preprocess` to transform the data.
-        """
-        pass
+    def preprocess(self, data: Any, flag: str = '') -> Any:
+        """Prepare the raw data for the model.
 
-    @abc.abstractmethod
-    @cached_property
-    def test_dataloader(self) -> torch.utils.data.DataLoader:
-        """The dataloader for the test set.
-        
-        Returns a `torch.utils.data.DataLoader` that yields batches of test data.
-        The `Dataset` in the `DataLoader` should call `self.preprocess` to transform the data.
-        """
-        pass
+        The way this method processes the `data` depends on the `flag`.
 
-    @abc.abstractmethod
-    def preprocess(self, input: Any = None, target: Any = None, augment: bool = False) -> Any:
-        """Preprocess the input data and/or the corresponding target using optional augmentations.
+        When `flag` is empty (the default), the `data` are assumed to represent the 
+        model's input that is used for inference. 
 
-        This method is intended to be called within the `transform` function of the `Dataset` 
-        in the train, val, and test dataloaders. It should implement the necessary steps to 
-        prepare the raw `input` data and/or the corresponding `target` for a single sample. 
-        If `augment` is True, this method should also apply data augmentation.
+        When `flag` has a specific value, the method may perform different preprocessing 
+        steps such as transforming the target or augmenting the input for training.
 
         Parameters
         ----------
-        input : Any, optional
-            The raw input data for a single sample. Defaults to None.
-        target : Any, optional
-            The target data corresponding to the input. Defaults to None.
-        augment : bool, optional
-            A flag indicating whether to apply data augmentation. Defaults to False.
+        data : Any
+            The raw input data to be processed.
+        flag : str, optional
+            A string indicating the purpose of the preprocessing. The default
+            is an empty string, meaning preprocess the model's input for inference.
 
         Returns
         -------
         Any
-            The first of the following: 
-            (1) the preprocessed `input` if `target` is None,
-            (2) the preprocessed `target` if `input` is None,
-            (3) the preprocessed (`input`, `target`) otherwise.
+            The preprocessed data.
         """
         pass
 
     @abc.abstractmethod
     def postprocess(self, outputs: torch.Tensor) -> Any:
-        """Postprocess the model's outputs and returns the final predictions.
+        """Postprocess the model's outputs.
 
-        This method takes the neural network `outputs` and transforms it into 
-        the final predictions. 
+        This method transforms the outputs of the neural network. 
 
         Parameters
         ----------
@@ -145,7 +129,7 @@ class AbstractTorch(abc.ABC):
         Returns
         -------
         Any
-            The final predictions.
+            The postprocessed outputs.
         """
         pass
 
@@ -195,8 +179,58 @@ class AbstractTorch(abc.ABC):
         """
         pass
 
-    def train(self, epochs: int, validate: bool = True) -> None:
-        """Train the model for a specified number of epochs.
+    def collate(self, batch: Any) -> Any:
+        """Collate a batch of data.
+
+        This method applies the `torch.utils.data.default_collate` function, which is 
+        used as the default function for collation in dataloaders. For custom data types, 
+        overwrite this function and pass it as the `collate_fn` argument to the dataloader.
+
+        Parameters
+        ----------
+        batch : Any
+            The batch of data to collate.
+
+        Returns
+        -------
+        Any
+            The collated batch of data.
+        """
+        return torch.utils.data.default_collate(batch)
+    
+    def move(self, data: Any) -> Any:
+        """Move data to the current device.
+
+        This method moves the data to the device specified by `self.device`. It supports 
+        moving tensors, lists, tuples, and dictionaries. For custom data types, overwrite 
+        this function to implement the necessary logic for moving the data to the device.
+
+        Parameters
+        ----------
+        data : Any
+            The data to move to the current device.
+
+        Returns
+        -------
+        Any
+            The data moved to the current device.
+        """
+        if isinstance(data, torch.Tensor):
+            return data.to(self.device)
+        elif isinstance(data, list):
+            return [self.move(item) for item in data]
+        elif isinstance(data, tuple):
+            return tuple(self.move(item) for item in data)
+        elif isinstance(data, dict):
+            return {key: self.move(value) for key, value in data.items()}
+        else:
+            raise TypeError(
+                f"Unsupported data type: {type(data)}. "
+                "Please implement the move method for custom data types."
+            )
+
+    def train(self, epochs: int, on: str = 'train', val: str = 'val') -> None:
+        """Train the model.
 
         This method sets the network to training mode, iterates through the
         training dataloader for the given number of epochs, performs forward
@@ -208,72 +242,52 @@ class AbstractTorch(abc.ABC):
         ----------
         epochs : int
             The number of training epochs to perform.
-        validate : bool, optional
-            Whether to perform validation after each epoch. Defaults to True.
+        on : str, optional
+            The name of the training dataloader. Defaults to 'train'.
+        val : str, optional
+            The name of the validation dataloader. Defaults to 'val'.
         """
         for epoch in range(1, epochs + 1):
             self.network.train()
-            with torch.device(self.device):
-                for inputs, targets in self.train_dataloader:
-                    self.optimizer.zero_grad()
-                    outputs = self.network(inputs)
-                    loss = self.loss(outputs, targets)
-                    loss.backward()
-                    self.optimizer.step()
-                    info = {"epoch": epoch, "train/loss": loss.item()}
-                    metrics = self.metrics(outputs, targets)
-                    info.update({"train/" + key: val for key, val in metrics.items()})
-                    self.logger.log(info)
-            if validate:
-                self.validate()
+            self.network.to(self.device)
+            for batch, (inputs, targets) in enumerate(self.dataloaders[on]):
+                inputs, targets = self.move((inputs, targets))
+                self.optimizer.zero_grad()
+                outputs = self.network(inputs)
+                loss = self.loss(outputs, targets)
+                loss.backward()
+                self.optimizer.step()
+                info = {"epoch": epoch, "batch": batch, "train/loss": loss.item()}
+                metrics = self.metrics(outputs, targets)
+                info.update({"train/" + key: val for key, val in metrics.items()})
+                self.logger.log(info)
+            if val:
+                self.eval(on=val)
 
-    def validate(self) -> None:
-        """Evaluate the model on the validation set.
+    def eval(self, on: str) -> None:
+        """Evaluate the model.
 
         This method sets the network to evaluation mode, iterates through the
-        validation dataloader, calculates the loss and metrics, and logs the
+        given dataloader, calculates the loss and metrics, and logs the
         results. No gradients are computed during this process.
         """
         self.network.eval()
         tot_loss, num_batches = 0, 0
         all_outputs, all_targets = [], []
-        with torch.device(self.device):
-            with torch.no_grad():
-                for inputs, targets in self.val_dataloader:
-                    outputs = self.network(inputs)
-                    tot_loss += self.loss(outputs, targets).item()
-                    all_outputs.append(outputs)
-                    all_targets.append(targets)
-                    num_batches += 1
-                loss = tot_loss / num_batches
-                info = {"val/loss": loss.item()}
-                metrics = self.metrics(torch.cat(all_outputs), torch.cat(all_targets))
-                info.update({"val/" + key: val for key, val in metrics.items()})
-                self.logger.log(info)
-
-    def test(self) -> None:
-        """Evaluate the model on the test set.
-        
-        This method sets the network to evaluation mode, iterates through the
-        test dataloader, calculates the loss and metrics, and logs the
-        results. No gradients are computed during this process.
-        """
-        self.network.eval()
-        tot_loss, num_batches = 0, 0
-        all_outputs, all_targets = [], []
-        with torch.device(self.device):
-            with torch.no_grad():
-                for inputs, targets in self.test_dataloader:
-                    outputs = self.network(inputs)
-                    tot_loss += self.loss(outputs, targets)
-                    all_outputs.append(outputs)
-                    all_targets.append(targets)
-                    num_batches += 1
-                loss = tot_loss / num_batches
-                info = {"test/loss": loss.item()}
-                metrics = self.metrics(torch.cat(all_outputs), torch.cat(all_targets))
-                info.update({"test/" + key: val for key, val in metrics.items()})
-                self.logger.log(info)
+        with torch.no_grad():
+            self.network.to(self.device)
+            for inputs, targets in self.dataloaders[on]:
+                inputs, targets = self.move((inputs, targets))
+                outputs = self.network(inputs)
+                tot_loss += self.loss(outputs, targets)
+                all_outputs.append(outputs)
+                all_targets.append(targets)
+                num_batches += 1
+        loss = tot_loss / num_batches
+        info = {"val/loss": loss.item()}
+        metrics = self.metrics(torch.cat(all_outputs), torch.cat(all_targets))
+        info.update({"val/" + key: val for key, val in metrics.items()})
+        self.logger.log(info)
 
     def predict(self, input: Any) -> Any:
         """Predict the output for a given input.
@@ -286,19 +300,23 @@ class AbstractTorch(abc.ABC):
         Parameters
         ----------
         input : Any
-            The input data to make a prediction on.
+            The raw input data to predict.
 
         Returns
         -------
         Any
-            The postprocessed prediction for the input data.
+            The postprocessed prediction.
         """
         self.network.eval()
-        with torch.device(self.device):
-            with torch.no_grad():
-                inputs = torch.utils.data.default_collate([self.preprocess(input)])
-                outputs = self.network(inputs)
-                return self.postprocess(outputs)[0]
+        self.network.to(self.device)
+        with torch.no_grad():
+            preprocessed = self.preprocess(input)
+            batch = [preprocessed]
+            collated = self.collate(batch)
+            inputs = self.move(collated)
+            outputs = self.network(inputs)
+            predictions = self.postprocess(outputs)
+        return predictions[0]
 
     def save(self, filepath: str) -> None:
         """Save the the model's and optimizer's state dictionaries.
@@ -327,13 +345,3 @@ class AbstractTorch(abc.ABC):
         self.network.load_state_dict(checkpoint['network_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         
-    def to(self, device: Union[str, torch.device]):
-        """Move the model to device.
-
-        Parameters
-        ----------
-        device : str or torch.device
-            The target device (e.g., 'cpu', 'cuda', 'mps').
-        """
-        self.network.to(device)
-        self.device = torch.device(device)
