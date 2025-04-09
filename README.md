@@ -71,7 +71,7 @@ Initialize the class with
 ```py
 model = ClassName(
     device: Union[str, torch.device] = None, 
-    log: Callable = print,
+    logger: Callable = print,
     **hparams
 )
 ```
@@ -80,13 +80,13 @@ model = ClassName(
 
 The `device` is the [`torch.device`](https://pytorch.org/docs/stable/tensor_attributes.html#torch.device) to use. Defaults to `None`, which will try CUDA, then MPS, and finally fall back to CPU.
 
-#### Log
+#### Logger
 
 A logging function that takes a dictionary in input. The default prints to standard output. You can can easily log with [wandb](https://pypi.org/project/wandb/)
 
 ```py
 import wandb
-model = ClassName(log=wandb.log)
+model = ClassName(logger=wandb.log)
 ```
 
 or with any other custom logger.
@@ -123,7 +123,7 @@ where
 - `val` is the name of the validation dataloader. Defaults to 'val'.
 - `gas` is the number of gradient accumulation steps. Defaults to 1 (no gradient accumulation).
 - `log` is a dictionary of additional information to log. 
-- `callback` is a function that is called after each epoch. It should accept the current instance and the logs as arguments. If it returns `True`, training will stop.
+- `callback` is a function that is called after each epoch. It should accept two arguments: the instance itself and a list of logs. If the callback returns `True`, training stops.
 
 This method returns the training/validation metrics for each batch and at the end of each epoch.
 
