@@ -9,26 +9,22 @@ def main():
     parser.add_argument('--path', type=str, required=True, help='The path to save the generated template file.')
     args = parser.parse_args()
 
-    abstract_methods = {}
-    abstract_properties = {}
+    methods = {}
+    cached_properties = {}
 
     for name, member in inspect.getmembers(AbstractTorch):
-        if hasattr(member, '__isabstractmethod__'):
+        if hasattr(member, '__isabstractmethod__') or name in ('collate', 'move'):
             if isinstance(AbstractTorch.__dict__.get(name), cached_property):
-                abstract_properties[name] = member.__doc__ or ""
+                cached_properties[name] = member.__doc__ or ""
             elif callable(member):
                 sig = inspect.signature(member)
-                abstract_methods[name] = (sig, member.__doc__ or "")
+                methods[name] = (sig, member.__doc__ or "")
 
     template = """
 import torch
 from atorch import AbstractTorch
 from functools import cached_property
 from typing import Any, Dict
-
-# For custom data types, you can extend the default collate function with:
-# >>> torch.utils.data.default_collate_fn_map.update({CustomType: collate_customtype_fn})
-# as described at https://pytorch.org/docs/stable/data.html#torch.utils.data._utils.collate.collate
 
 
 class ClassName(AbstractTorch):
@@ -42,7 +38,7 @@ class ClassName(AbstractTorch):
     \"\"\"
 """
     
-    for name, doc in abstract_properties.items():
+    for name, doc in cached_properties.items():
         template += f"""
     @cached_property
     def {name}(self):
@@ -54,8 +50,11 @@ class ClassName(AbstractTorch):
         'metrics': 'return {}',
         'postprocess': 'return outputs',
         'preprocess': 'return input if target is None else target if input is None else (input, target)',
+        'collate': 'return super().collate(batch)',
+        'move': 'return super().move(data)',
     }
-    for name, (sig, doc) in abstract_methods.items():
+
+    for name, (sig, doc) in methods.items():
         signature_str = str(sig)
         template += f"""
     def {name}{signature_str}:
@@ -68,11 +67,10 @@ class ClassName(AbstractTorch):
 if __name__ == "__main__":
     # Example usage
     model = ClassName()
-    model.train()
-    model.test()
+    model.train(epochs=1)
 """
 
-    with open(args.path, "w") as f:
+    with open(args.path, "x") as f:
         f.write(template)
         
     print(f"Template generated at: {args.path}")
