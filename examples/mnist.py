@@ -30,21 +30,21 @@ class MNISTClassifier(AbstractTorch):
         logic in the `collate` method of this class. The `collate` method should then be 
         passed to the `collate_fn` argument when creating the `DataLoader` instances. 
         """
-        train_dataloder = DataLoader(
+        train_dataloader = DataLoader(
             dataset=datasets.MNIST('./data', train=True, download=True, transform=partial(self.preprocess, flag='augment')), 
             shuffle=True,
             batch_size=self.hparams.batch_size, 
             num_workers=self.hparams.num_workers,
             multiprocessing_context='fork' if torch.backends.mps.is_available() else None
         )
-        val_dataloder = DataLoader(
+        val_dataloader = DataLoader(
             dataset=datasets.MNIST('./data', train=False, download=True, transform=self.preprocess), 
             shuffle=False,
             batch_size=self.hparams.batch_size, 
             num_workers=self.hparams.num_workers,
             multiprocessing_context='fork' if torch.backends.mps.is_available() else None
         )
-        return {'train': train_dataloder, 'val': val_dataloder}
+        return {'train': train_dataloader, 'val': val_dataloader}
     
     def preprocess(self, data: Any, flag: str = '') -> Any:
         """Prepare the raw data for the model.
