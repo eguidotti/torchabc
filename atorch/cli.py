@@ -6,7 +6,7 @@ from . import AbstractTorch
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a template implementing AbstractTorch.")
-    parser.add_argument('--file', type=str, required=True, help='The path to save the generated template file.')
+    parser.add_argument('--create', type=str, required=True, help='The path to create the template file.')
     parser.add_argument('--minimal', action='store_true', help='Generate a minimal template without docstrings.')
     args = parser.parse_args()
 
@@ -82,10 +82,10 @@ if __name__ == "__main__":
     model.train(epochs=1)
 """
 
-    with open(args.file, "x") as f:
+    with open(args.create, "x") as f:
         f.write(template.lstrip())
         
-    print(f"Template generated at: {args.file}")
+    print(f"Template generated at: {args.create}")
 
 if __name__ == "__main__":
     main()
