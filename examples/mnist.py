@@ -186,7 +186,7 @@ if __name__ == "__main__":
     model = MNISTClassifier(lr=0.001, batch_size=64, num_workers=4)
     
     # a simple callback to save the model after each epoch
-    callback = lambda self, logs: self.save(f"epoch_{logs[-1]['epoch']}.pth")  
+    callback = lambda self, logs: self.save(f"epoch_{logs[-1]['val/epoch']}.pth")  
 
     # train the model
     model.train(epochs=3, callback=callback)
