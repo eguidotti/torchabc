@@ -10,7 +10,7 @@ class AbstractTorch(abc.ABC):
     An abstract base class for training, evaluation, and inference of pytorch models.
     """
 
-    def __init__(self, device: Union[str, torch.device] = None, log: Callable = print, **hparams):
+    def __init__(self, device: Union[str, torch.device] = None, logger: Callable = print, **hparams):
         """Initialize the model.
 
         Parameters
@@ -18,7 +18,7 @@ class AbstractTorch(abc.ABC):
         device : str or torch.device, optional
             The device to use. Defaults to None, which will try CUDA, then MPS, and 
             finally fall back to CPU.
-        log : Callable, optional
+        logger : Callable, optional
             A logging function that takes a dictionary in input. Defaults to print.
         **hparams :
             Arbitrary keyword arguments that will be stored in the `self.hparams` namespace.
@@ -27,7 +27,7 @@ class AbstractTorch(abc.ABC):
         ----------
         device : torch.device
             The device the model will operate on.
-        log : Callable
+        logger : Callable
             The function used for logging.
         hparams : SimpleNamespace
             A namespace containing the hyperparameters.
@@ -43,7 +43,7 @@ class AbstractTorch(abc.ABC):
             self.device = torch.device("mps")
         else:
             self.device = torch.device("cpu")
-        self.log = log
+        self.logger = logger
         self.hparams = SimpleNamespace(**hparams)
         self.epoch = 0
 
@@ -260,14 +260,13 @@ class AbstractTorch(abc.ABC):
         log : dict, optional
             A dictionary of additional information to log. 
         callback : Callable, optional
-            A callback function that is called after each epoch. It should
-            accept the current instance and the logs as arguments. If it returns
-            True, training will stop.
+            A callback function that is called after each epoch. It should accept two arguments:
+            the instance itself and a list of logs. If the callback returns True, training stops.
         
         Returns
         -------
         list
-            A list of dictionaries containing the logs for each batch and epoch.
+            A list of dictionaries containing the logs.
         """
         logs, log_batch, log_epoch = ([], {}, {}) if log is None else ([], log.copy(), log.copy())
         for epoch in range(self.epoch + 1, self.epoch + 1 + epochs):
@@ -288,7 +287,7 @@ class AbstractTorch(abc.ABC):
                     self.optimizer.zero_grad()
                     log_batch.update({"mode": "train", "epoch": epoch, "batch": batch, "loss": loss_gas})
                     log_batch.update(self.metrics(outputs, targets))
-                    self.log(log_batch)
+                    self.logger(log_batch)
                     logs.append(log_batch.copy())
                     loss_gas = 0
             if val:
@@ -314,7 +313,7 @@ class AbstractTorch(abc.ABC):
                     self.scheduler.step()
                     log_epoch.update({"lr": self.scheduler.get_last_lr()})
             if log_epoch:
-                self.log(log_epoch)
+                self.logger(log_epoch)
                 logs.append(log_epoch.copy())
             if callback:
                 stop = callback(self, logs)
