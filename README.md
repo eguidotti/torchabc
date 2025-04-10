@@ -1,12 +1,12 @@
-# AbstractTorch
+# TorchABC
 
-`AbstractTorch` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it is shipped as a simple seld-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
+`TorchABC` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it is shipped as a simple seld-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
 
 ## Workflow
 
 ![diagram](https://github.com/user-attachments/assets/f3eac7aa-6a39-4a93-887c-7b7f8ac5f0f4)
 
-`AbstractTorch` implements the workflow illustrated above. The workflow begins with raw **DATA**, which undergo a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** features and their corresponding **TARGET** labels.
+`TorchABC` implements the workflow illustrated above. The workflow begins with raw **DATA**, which undergo a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** features and their corresponding **TARGET** labels.
 
 Next, the individual **INPUT** samples are grouped into batches called **INPUTS** using a **collate** function. Similarly, the **TARGET** labels are batched into **TARGETS**. The **INPUTS** are then fed into the neural **network**, which produces **OUTPUTS**.
 
@@ -33,7 +33,7 @@ torchabc --create template.py
 The template is structured as follows.
 
 ```py
-class ClassName(AbstractTorch):
+class ClassName(TorchABC):
     
     @cached_property
     def dataloaders(self):
@@ -212,4 +212,4 @@ Get started with simple self-contained examples:
 
 ## Contribute
 
-Contributions are welcome! Submit pull requests with new [examples](https://github.com/eguidotti/torchabc/tree/main/examples) or improvements to the core [`AbstractTorch`](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py) class itself. 
+Contributions are welcome! Submit pull requests with new [examples](https://github.com/eguidotti/torchabc/tree/main/examples) or improvements to the core [`TorchABC`](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py) class itself. 
