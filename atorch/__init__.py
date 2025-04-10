@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from typing import Any, Union, Dict, List, Callable
 
 
-class AbstractTorch(abc.ABC):
+class TorchABC(abc.ABC):
     """
     A minimal abstract class for training, evaluation, and inference of pytorch models.
     """
