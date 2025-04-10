@@ -1,16 +1,16 @@
 # TorchABC
 
-`TorchABC` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it consists of a simple seld-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
+`TorchABC` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it consists of a simple self-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
 
 ## Workflow
 
 ![diagram](https://github.com/user-attachments/assets/f3eac7aa-6a39-4a93-887c-7b7f8ac5f0f4)
 
-`TorchABC` implements the workflow illustrated above. The workflow begins with raw **DATA**, which undergo a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** features and their corresponding **TARGET** labels.
+`TorchABC` implements the workflow illustrated above. The workflow begins with raw **DATA**, which undergoes a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** features and their corresponding **TARGET** labels.
 
 Next, the individual **INPUT** samples are grouped into batches called **INPUTS** using a **collate** function. Similarly, the **TARGET** labels are batched into **TARGETS**. The **INPUTS** are then fed into the neural **network**, which produces **OUTPUTS**.
 
-The **OUTPUTS** of the network are compared to the **TARGETS** using a **LOSS** function. The calculated loss quantifies the error between the model's predictions and the true targets. This **LOSS** is then used by the **optimizer / scheduler** to update the parameters of the **network** in a way that minimizes the loss. The optimizer dictates how the parameters are adjusted, while the scheduler can dynamically adjust the learning rate of the optimizer during training.
+The **OUTPUTS** of the network are compared to the **TARGETS** using a **LOSS** function. The calculated loss quantifies the error between the model's predictions and the actual targets. This **LOSS** is then used by the **optimizer / scheduler** to update the parameters of the **network** to minimize the loss. The optimizer controls how the parameters are adjusted, while the scheduler can dynamically change the learning rate of the optimizer during training.
 
 Finally, the raw **OUTPUTS** from the network undergo a **postprocess** step to generate the final **PREDICTIONS**. This could involve converting probabilities to class labels, applying thresholds, or other task-specific transformations. 
 
@@ -64,15 +64,15 @@ class ClassName(TorchABC):
         return outputs
 ```
 
-Fill out the template with the dataloaders, preprocessing and postprocessing steps, the neural network, optimizer, scheduler, loss and evaluation metrics. 
+Fill out the template with the dataloaders, preprocessing and postprocessing steps, the neural network, optimizer, scheduler, loss, and evaluation metrics. 
 
 #### `dataloaders`: the dataloaders for training and evaluation
 
-This method defines and returns a dictionary containing the [`DataLoader`](https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader) instances for the training, validation, and testing datasets. The keys of the dictionary should correspond to the names of the datasets (e.g., 'train', 'val', 'test'), and the values should be their respective `DataLoader` objects. Any transformation of the raw input data for each dataset should be implemented within the `preprocess` method of this class. The `preprocess` method should then be passed as the `transform` argument of the [`Dataset`](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset) instances.
+This method defines and returns a dictionary containing the [`DataLoader`](https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader) instances for the training, validation, and testing datasets. The dictionary's keys should correspond to the names of the datasets (e.g., 'train', 'val', 'test'), and the values should be their respective `DataLoader` objects. Any transformation of the raw input data for each dataset should be implemented within the `preprocess` method of this class. The `preprocess` method should then be passed as the `transform` argument of the [`Dataset`](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset) instances.
 
 #### `preprocess`: preprocessing
 
-The way this method processes the data depends on a `flag`. When `flag` is empty (the default), the data are assumed to represent the  model's input that is used for inference. When `flag` has a specific value, the method may perform different preprocessing steps such as transforming the target or augmenting the input for training.
+This method processes the data differently depending on a `flag`. When `flag` is empty (the default), the data are assumed to represent the model's input used for inference. When `flag` has a specific value, the method may perform different preprocessing steps, such as transforming the target or augmenting the input for training.
 
 #### `network`: the neural network
 
@@ -92,11 +92,11 @@ This method defines the loss function that quantifies the discrepancy between th
 
 #### `metrics`: evaluation metrics
 
-This method calculates various metrics that quantify the discrepancy between the neural network `outputs` and the corresponding `targets`. Unlike `loss`, which is primarily used for training, these metrics are only used for evaluation and they do not need to be differentiable.
+This method calculates various metrics that quantify the discrepancy between the neural network `outputs` and the corresponding `targets`. Unlike `loss`, which is primarily used for training, these metrics are only used for evaluation and do not need to be differentiable.
 
 #### `postprocess`: postprocess
 
-This method transforms the outputs of the neural network to generate the final predictions. 
+This method transforms the neural network outputs to generate the final predictions. 
 
 ## Usage
 
@@ -131,7 +131,7 @@ or with any other custom logger.
 
 #### Hyperparameters
 
-You will typically use several parameters to control the behaviour of `ClassName`, such as the learning rate or batch size. These parameters should be passed during initialization
+You will typically use several parameters to control the behavior of `ClassName`, such as the learning rate or batch size. These parameters should be passed during the initialization
 
 ```py
 model = ClassName(lr=0.001, batch_size=64)
