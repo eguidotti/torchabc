@@ -1,6 +1,6 @@
 [project]
 name = "torchabc"
-version = "0.1.4"
+version = "0.2.0"
 description = "A minimal abstract class for training, evaluation, and inference of pytorch models."
 authors = [
     {name = "Emanuele Guidotti",email = "emanuele.guidotti@usi.ch"}
