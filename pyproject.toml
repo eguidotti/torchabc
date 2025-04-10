@@ -1,18 +1,18 @@
 [tool.poetry]
-name = "atorch"
+name = "torchabc"
 version = "0.1.0"
-description = "An abstract base class for training, evaluation, and inference of pytorch models."
+description = "A minimal abstract class for training, evaluation, and inference of pytorch models."
 authors = ["Emanuele Guidotti <emanuele.guidotti@usi.ch>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/eguidotti/atorch"
+repository = "https://github.com/eguidotti/torchabc"
 
 [tool.poetry.dependencies]
 python = "^3.9"
 torch = "^2.6.0"
 
 [tool.poetry.scripts]
-atorch = "atorch.cli:main"
+torchabc = "torchabc.cli:main"
 
 [build-system]
 requires = ["poetry-core"]
