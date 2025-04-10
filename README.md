@@ -1,6 +1,6 @@
 # AbstractTorch
 
-`AbstractTorch` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it is shipped as a simple seld-contained [file](https://github.com/eguidotti/atorch/blob/main/atorch/__init__.py).
+`AbstractTorch` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it is shipped as a simple seld-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
 
 ## Workflow
 
@@ -21,13 +21,13 @@ Finally, the raw **OUTPUTS** from the network undergo a **postprocess** step to 
 Install the package.
 
 ```bash
-pip install atorch
+pip install torchabc
 ```
 
 Generate a template using the command line interface.
 
 ```bash
-atorch --create template.py
+torchabc --create template.py
 ```
 
 The template is structured as follows.
@@ -177,7 +177,7 @@ Load the model from a checkpoint.
 model.load("checkpoint.pth")
 ```
 
-You can also use the [`callback`](https://github.com/eguidotti/atorch/tree/main?tab=readme-ov-file#training) function to implement a custom checkpointing strategy. For instance, the following example saves a checkpoint after each training epoch.
+You can also use the [`callback`](https://github.com/eguidotti/torchabc/tree/main?tab=readme-ov-file#training) function to implement a custom checkpointing strategy. For instance, the following example saves a checkpoint after each training epoch.
 
 ```py
 callback = lambda self, logs: self.save(f"epoch_{logs[-1]['val/epoch']}.pth")
@@ -208,8 +208,8 @@ where `data` is the raw input data. This method returns the postprocessed predic
 
 Get started with simple self-contained examples:
 
-- [MNIST classification](https://github.com/eguidotti/atorch/blob/main/examples/mnist.py)
+- [MNIST classification](https://github.com/eguidotti/torchabc/blob/main/examples/mnist.py)
 
 ## Contribute
 
-Contributions are welcome! Submit pull requests with new [examples](https://github.com/eguidotti/atorch/tree/main/examples) or improvements to the core [`AbstractTorch`](https://github.com/eguidotti/atorch/blob/main/atorch/__init__.py) class itself. 
+Contributions are welcome! Submit pull requests with new [examples](https://github.com/eguidotti/torchabc/tree/main/examples) or improvements to the core [`AbstractTorch`](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py) class itself. 
