@@ -4,14 +4,14 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 import torchvision.transforms as T
 import torch.nn.functional as F
-from atorch import AbstractTorch
+from torchabc import TorchABC
 from functools import cached_property, partial
 from typing import Any, Dict
 
 
-class MNISTClassifier(AbstractTorch):
+class MNISTClassifier(TorchABC):
     """A simple convolutional neural network for classifying MNIST digits."""
-
+    
     @cached_property
     def dataloaders(self):
         """The dataloaders for training and evaluation.
@@ -21,9 +21,9 @@ class MNISTClassifier(AbstractTorch):
         should correspond to the names of the datasets (e.g., 'train', 'val', 'test'),
         and the values should be their respective `torch.utils.data.DataLoader` objects.
 
-        The transformation of the raw input data for each dataset should be implemented
+        Any transformation of the raw input data for each dataset should be implemented
         within the `preprocess` method of this class. The `preprocess` method should 
-        then be passed as the `transform` argument when creating the `Dataset` instances.
+        then be passed as the `transform` argument of the `Dataset` instances.
 
         If you require custom collation logic (i.e., a specific way to merge a list of
         samples into a batch beyond the default behavior), you should implement this
@@ -47,15 +47,13 @@ class MNISTClassifier(AbstractTorch):
         return {'train': train_dataloader, 'val': val_dataloader}
     
     def preprocess(self, data: Any, flag: str = '') -> Any:
-        """Prepare the raw data for the model.
+        """Prepare the raw data for the network.
 
         The way this method processes the `data` depends on the `flag`.
-
         When `flag` is empty (the default), the `data` are assumed to represent the 
-        model's input that is used for inference. 
-
-        When `flag` has a specific value, the method may perform different preprocessing 
-        steps such as transforming the target or augmenting the input for training.
+        model's input that is used for inference. When `flag` has a specific value, 
+        the method may perform different preprocessing steps such as transforming 
+        the target or augmenting the input for training.
 
         Parameters
         ----------
@@ -116,9 +114,9 @@ class MNISTClassifier(AbstractTorch):
         configured for `self.optimizer`.
         """
         return None
-
+    
     def loss(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute the loss between the model's outputs and the corresponding targets.
+        """Loss function.
 
         This method defines the loss function that quantifies the discrepancy
         between the neural network `outputs` and the corresponding `targets`. 
@@ -139,7 +137,7 @@ class MNISTClassifier(AbstractTorch):
         return F.cross_entropy(outputs, targets)
     
     def metrics(self, outputs: torch.Tensor, targets: torch.Tensor) -> Dict[str, float]:
-        """Compute evaluation metrics between the model's outputs and the corresponding targets.
+        """Evaluation metrics.
 
         This method calculates various metrics that quantify the discrepancy
         between the neural network `outputs` and the corresponding `targets`. 
@@ -161,11 +159,12 @@ class MNISTClassifier(AbstractTorch):
         """
         accuracy = (torch.argmax(outputs, dim=1) == targets).float().mean().item()
         return {"accuracy": accuracy}
-        
+    
     def postprocess(self, outputs: torch.Tensor) -> Any:
         """Postprocess the model's outputs.
 
-        This method transforms the outputs of the neural network. 
+        This method transforms the outputs of the neural network to 
+        generate the final predictions. 
 
         Parameters
         ----------
