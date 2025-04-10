@@ -1,17 +1,26 @@
 # AbstractTorch
 
-`AbstractTorch` is a minimal and modular abstract base class designed to simplify working with PyTorch. It provides a lightweight foundation for building, training, and evaluating models in PyTorch. It is meant to be an easy-to-use starting point for your custom PyTorch models and help you keeping code organized.
+`AbstractTorch` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it is shipped as a simple seld-contained [file](https://github.com/eguidotti/atorch/blob/main/atorch/__init__.py).
 
+![diagram](https://github.com/user-attachments/assets/f3eac7aa-6a39-4a93-887c-7b7f8ac5f0f4)
 
-## Installation
+`AbstractTorch` implements the workflow illustrated above. The workflow begins with raw **DATA**, which undergo a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** features and their corresponding **TARGET** labels.
 
-```bash
-pip install ...
-```
+Next, the individual **INPUT** samples are grouped into batches called **INPUTS** using a **collate** function. Similarly, the **TARGET** labels are batched into **TARGETS**. The **INPUTS** are then fed into the neural **network**, which produces **OUTPUTS**.
 
-This package depends on [`torch`](https://pypi.org/project/torch/) only.
+The **OUTPUTS** of the network are compared to the **TARGETS** using a **LOSS** function. The calculated loss quantifies the error between the model's predictions and the true targets. This **LOSS** is then used by the **optimizer / scheduler** to update the parameters of the **network** in a way that minimizes the loss. The optimizer dictates how the parameters are adjusted, while the scheduler can dynamically adjust the learning rate of the optimizer during training.
+
+Finally, the raw **OUTPUTS** from the network undergo a **postprocess** step to generate the final **PREDICTIONS**. This could involve converting probabilities to class labels, applying thresholds, or other task-specific transformations. 
+
+**The core logic blocks** are abstract. You define their specific behavior with maximum flexibility. 
 
 ## Quick start
+
+Install the package.
+
+```bash
+pip install atorch
+```
 
 Generate a template using the command line interface.
 
@@ -53,16 +62,43 @@ class ClassName(AbstractTorch):
         return outputs
 ```
 
-Fill out the template with the dataloaders, preprocessing and postprocessing steps, the neural network, optimizer, scheduler, loss and evaluation metrics. The model can now be trained with:
+Fill out the template with the dataloaders, preprocessing and postprocessing steps, the neural network, optimizer, scheduler, loss and evaluation metrics. 
 
-```py
-model = ClassName()
-model.train(epochs=1)
-```
+#### `dataloaders`: the dataloaders for training and evaluation
 
-That's it. Your model has now access to the training / evaluation / inference / checkpointing / logging routines implemented [here](https://github.com/eguidotti/atorch/blob/main/atorch/__init__.py) and illustrated below.
+This method defines and returns a dictionary containing the [`DataLoader`](https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader) instances for the training, validation, and testing datasets. The keys of the dictionary should correspond to the names of the datasets (e.g., 'train', 'val', 'test'), and the values should be their respective `DataLoader` objects. Any transformation of the raw input data for each dataset should be implemented within the `preprocess` method of this class. The `preprocess` method should then be passed as the `transform` argument of the [`Dataset`](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset) instances.
+
+#### `preprocess`: preprocessing
+
+The way this method processes the data depends on a `flag`. When `flag` is empty (the default), the data are assumed to represent the  model's input that is used for inference. When `flag` has a specific value, the method may perform different preprocessing steps such as transforming the target or augmenting the input for training.
+
+#### `network`: the neural network
+
+Returns a [`Module`](https://pytorch.org/docs/stable/generated/torch.nn.Module.html) whose input and output tensors assume the batch size is the first dimension: (batch_size, ...).
+
+#### `optimizer`: the optimizer for training the network
+
+Returns an [`Optimizer`](https://pytorch.org/docs/main/optim.html#torch.optim.Optimizer) configured for the `network`.
+
+#### `scheduler`: the learning rate scheduler for the optimizer
+
+Returns a [`LRScheduler`](https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LRScheduler.html) or [`ReduceLROnPlateau`](https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html) configured for the `optimizer`.
+
+#### `loss`: loss function
+
+This method defines the loss function that quantifies the discrepancy between the neural network `outputs` and the corresponding `targets`. The loss function should be differentiable to enable backpropagation.
+
+#### `metrics`: evaluation metrics
+
+This method calculates various metrics that quantify the discrepancy between the neural network `outputs` and the corresponding `targets`. Unlike `loss`, which is primarily used for training, these metrics are only used for evaluation and they do not need to be differentiable.
+
+#### `postprocess`: postprocess
+
+This method transforms the outputs of the neural network to generate the final predictions. 
 
 ## Usage
+
+After filling out the template above, you can use your class as follows.
 
 ### Initialization
 
@@ -127,19 +163,23 @@ This method returns a list of dictionaries containing the loss and evaluation me
 
 ### Checkpoints
 
-You can use the `callback` function to implement a custom checkpointing strategy. For instance, `save` a checkpoint after each training epoch.
+Save the model to a checkpoint.
 
 ```py
-callback = lambda self, logs: self.save(f"epoch_{logs[-1]['epoch']}.pth")  
-model.train(epochs=10, callback=callback)
+model.save("checkpoint.pth")
 ```
 
-The `callback` has access to the instance (`self`) and the history of training/validation metrics (`logs`) that is given as a list of dictionaries.  
-
-Next, you can `load` the model from a checkpoint as follows.
+Load the model from a checkpoint.
 
 ```py
-model.load("checkpoint_name.pth")
+model.load("checkpoint.pth")
+```
+
+You can also use the [`callback`](https://github.com/eguidotti/atorch/tree/main?tab=readme-ov-file#training) function to implement a custom checkpointing strategy. For instance, the following example saves a checkpoint after each training epoch.
+
+```py
+callback = lambda self, logs: self.save(f"epoch_{logs[-1]['val/epoch']}.pth")
+model.train(epochs=10, val='val', callback=callback)
 ```
 
 ### Evaluation
@@ -150,7 +190,7 @@ Evaluate the model with
 model.eval(on='test')
 ```
 
-where `on` is the name of the dataloader to evaluate on. This should be one of the keys in `dataloaders`. This method returns a dictionary containing the evaluation metrics.
+where `on` is the name of the dataloader to evaluate on. This should be one of the keys in [`dataloaders`](https://github.com/eguidotti/atorch/tree/main?tab=readme-ov-file#dataloaders-the-dataloaders-for-training-and-evaluation). This method returns a dictionary containing the evaluation metrics.
 
 ### Inference
 
@@ -162,65 +202,11 @@ model.predict(data)
 
 where `data` is the raw input data. This method returns the postprocessed prediction.
 
-## Introduction by example
+## Examples
 
 Get started with simple self-contained examples:
 
 - [MNIST classification](https://github.com/eguidotti/atorch/blob/main/examples/mnist.py)
-
-## Implementation design
-
-The `AbstractTorch` class implements the workflow represented below.
-
-![diagram](https://github.com/user-attachments/assets/f3eac7aa-6a39-4a93-887c-7b7f8ac5f0f4)
-
-The workflow begins with raw **DATA**, which undergo a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** features and their corresponding **TARGET** labels.
-
-Next, the individual **INPUT** samples are grouped into batches called **INPUTS** using a **collate** function. Similarly, the **TARGET** labels are batched into **TARGETS**. The **INPUTS** are then fed into the neural **network**, which produces **OUTPUTS**.
-
-The **OUTPUTS** of the network are compared to the **TARGETS** using a **LOSS** function. The calculated loss quantifies the error between the model's predictions and the true labels. This **LOSS** is then used by the **optimizer / scheduler** to update the parameters of the **network** in a way that minimizes the loss. The optimizer dictates how the parameters are adjusted, while the scheduler can dynamically adjust the learning rate of the optimizer during training.
-
-Finally, the raw **OUTPUTS** from the network undergo a **postprocess** step to generate the final **PREDICTIONS**. This could involve converting probabilities to class labels, applying thresholds, or other task-specific transformations. 
-
-**The core logic blocks** are abstract. You define their specific behavior with maximum flexibility. Though generally not recommended, you can also copy/paste and directly edit the [`AbstractTorch`](https://github.com/eguidotti/atorch/blob/main/atorch/__init__.py) class because the code is self-contained.
-
-## Abstract methods
-
-A brief overview of the abstract methods is provided below. For the complete documentation, see [`AbstractTorch`](https://github.com/eguidotti/atorch/blob/main/atorch/__init__.py).
-
-### `dataloaders`: the dataloaders for training and evaluation
-
-This method defines and returns a dictionary containing the [`DataLoader`](https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader) instances for the training, validation, and testing datasets. The keys of the dictionary should correspond to the names of the datasets (e.g., 'train', 'val', 'test'), and the values should be their respective `DataLoader` objects. Any transformation of the raw input data for each dataset should be implemented within the `preprocess` method of this class. The `preprocess` method should then be passed as the `transform` argument of the [`Dataset`](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset) instances.
-
-
-### `preprocess`: preprocessing
-
-The way this method processes the data depends on a `flag`. When `flag` is empty (the default), the data are assumed to represent the  model's input that is used for inference. When `flag` has a specific value, the method may perform different preprocessing steps such as transforming the target or augmenting the input for training.
-
-
-### `network`: the neural network
-
-Returns a [`Module`](https://pytorch.org/docs/stable/generated/torch.nn.Module.html) whose input and output tensors assume the batch size is the first dimension: (batch_size, ...).
-
-### `optimizer`: the optimizer for training the network
-
-Returns an [`Optimizer`](https://pytorch.org/docs/main/optim.html#torch.optim.Optimizer) configured for the `network`.
-
-### `scheduler`: the learning rate scheduler for the optimizer
-
-Returns a [`LRScheduler`](https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LRScheduler.html) or [`ReduceLROnPlateau`](https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html) configured for the `optimizer`.
-
-### `loss`: loss function
-
-This method defines the loss function that quantifies the discrepancy between the neural network `outputs` and the corresponding `targets`. The loss function should be differentiable to enable backpropagation.
-
-### `metrics`: evaluation metrics
-
-This method calculates various metrics that quantify the discrepancy between the neural network `outputs` and the corresponding `targets`. Unlike `loss`, which is primarily used for training, these metrics are only used for evaluation and they do not need to be differentiable.
-
-### `postprocess`: postprocess
-
-This method transforms the outputs of the neural network to generate the final predictions. 
 
 ## Contribute
 
