@@ -7,7 +7,7 @@ from typing import Any, Union, Dict, List, Callable
 
 class AbstractTorch(abc.ABC):
     """
-    An abstract base class for training, evaluation, and inference of pytorch models.
+    A minimal abstract class for training, evaluation, and inference of pytorch models.
     """
 
     def __init__(self, device: Union[str, torch.device] = None, logger: Callable = print, **hparams):
