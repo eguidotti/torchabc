@@ -2,6 +2,8 @@
 
 `AbstractTorch` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it is shipped as a simple seld-contained [file](https://github.com/eguidotti/atorch/blob/main/atorch/__init__.py).
 
+## Workflow
+
 ![diagram](https://github.com/user-attachments/assets/f3eac7aa-6a39-4a93-887c-7b7f8ac5f0f4)
 
 `AbstractTorch` implements the workflow illustrated above. The workflow begins with raw **DATA**, which undergo a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** features and their corresponding **TARGET** labels.
