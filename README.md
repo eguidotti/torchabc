@@ -1,6 +1,6 @@
 # TorchABC
 
-`TorchABC` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it is shipped as a simple seld-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
+`TorchABC` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it consists of a simple seld-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
 
 ## Workflow
 
