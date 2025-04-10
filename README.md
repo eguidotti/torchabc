@@ -137,7 +137,7 @@ You will typically use several parameters to control the behavior of `ClassName`
 model = ClassName(lr=0.001, batch_size=64)
 ```
 
-and are stored in the attribute `hparams` of the `model`. For instance, use `hparams.lr` to access the `lr` value.
+and are stored in the attribute `hparams` of the model. For instance, use `hparams.lr` to access the `lr` value.
 
 ### Training
 
