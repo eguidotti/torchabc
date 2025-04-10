@@ -1,11 +1,11 @@
 import argparse
 import inspect
 from functools import cached_property
-from . import AbstractTorch
+from . import TorchABC
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate a template implementing AbstractTorch.")
+    parser = argparse.ArgumentParser(description="Generate template.")
     parser.add_argument('--create', type=str, required=True, help='The path to create the template file.')
     parser.add_argument('--minimal', action='store_true', help='Generate a minimal template without docstrings.')
     args = parser.parse_args()
@@ -19,9 +19,9 @@ def main():
         'preprocess': 'return data',
     }
 
-    for name, member in inspect.getmembers(AbstractTorch):
+    for name, member in inspect.getmembers(TorchABC):
         if hasattr(member, '__isabstractmethod__'):
-            if isinstance(AbstractTorch.__dict__.get(name), cached_property):
+            if isinstance(TorchABC.__dict__.get(name), cached_property):
                 cached_properties[name] = member.__doc__ or ""
             elif callable(member):
                 sig = inspect.signature(member)
@@ -29,16 +29,16 @@ def main():
 
     template = """
 import torch
-from atorch import AbstractTorch
+from torchabc import TorchABC
 from functools import cached_property
 from typing import Any, Dict
 
 
-class ClassName(AbstractTorch):"""
+class ClassName(TorchABC):"""
 
     if not args.minimal:
         template += """
-    \"\"\"A concrete implementation of the AbstractTorch base class.
+    \"\"\"A concrete implementation of the TorchABC abstract class.
 
     Use this template to implement your own model by following these steps:
     - replace ClassName with the name of your model,
