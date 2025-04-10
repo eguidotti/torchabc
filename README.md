@@ -6,7 +6,7 @@
 
 ![diagram](https://github.com/user-attachments/assets/f3eac7aa-6a39-4a93-887c-7b7f8ac5f0f4)
 
-`TorchABC` implements the workflow illustrated above. The workflow begins with raw **DATA**, which undergoes a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** features and their corresponding **TARGET** labels.
+`TorchABC` implements the workflow illustrated above. The workflow begins with raw **DATA**, which undergoes a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** samples and their corresponding **TARGET** labels.
 
 Next, the individual **INPUT** samples are grouped into batches called **INPUTS** using a **collate** function. Similarly, the **TARGET** labels are batched into **TARGETS**. The **INPUTS** are then fed into the neural **network**, which produces **OUTPUTS**.
 
