@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "torchabc"
-version = "0.1.0"
+version = "0.1.1"
 description = "A minimal abstract class for training, evaluation, and inference of pytorch models."
 authors = ["Emanuele Guidotti <emanuele.guidotti@usi.ch>"]
 license = "MIT"
