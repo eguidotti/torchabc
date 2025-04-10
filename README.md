@@ -192,7 +192,7 @@ Evaluate the model with
 model.eval(on='test')
 ```
 
-where `on` is the name of the dataloader to evaluate on. This should be one of the keys in [`dataloaders`](https://github.com/eguidotti/atorch/tree/main?tab=readme-ov-file#dataloaders-the-dataloaders-for-training-and-evaluation). This method returns a dictionary containing the evaluation metrics.
+where `on` is the name of the dataloader to evaluate on. This should be one of the keys in the `dataloaders`. This method returns a dictionary containing the evaluation metrics.
 
 ### Inference
 
