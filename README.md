@@ -1,6 +1,6 @@
 # TorchABC
 
-`TorchABC` is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it consists of a simple self-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
+[`TorchABC`](https://github.com/eguidotti/torchabc) is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it consists of a simple self-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
 
 ## Workflow
 
@@ -177,7 +177,7 @@ Load the model from a checkpoint.
 model.load("checkpoint.pth")
 ```
 
-You can also use the [`callback`](https://github.com/eguidotti/torchabc/tree/main?tab=readme-ov-file#training) function to implement a custom checkpointing strategy. For instance, the following example saves a checkpoint after each training epoch.
+You can also use the `callback` function to implement a custom checkpointing strategy. For instance, the following example saves a checkpoint after each training epoch.
 
 ```py
 callback = lambda self, logs: self.save(f"epoch_{logs[-1]['val/epoch']}.pth")
