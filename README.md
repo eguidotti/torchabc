@@ -1,20 +1,20 @@
 # TorchABC
 
-[`TorchABC`](https://github.com/eguidotti/torchabc) is a minimal abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it consists of a simple self-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
+[`TorchABC`](https://github.com/eguidotti/torchabc) is an abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it consists of a simple self-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
 
 ## Workflow
 
 ![diagram](https://github.com/user-attachments/assets/f3eac7aa-6a39-4a93-887c-7b7f8ac5f0f4)
 
-`TorchABC` implements the workflow illustrated above. The workflow begins with raw **DATA**, which undergoes a **preprocess** step. This preprocessing step transforms the raw data into **INPUT** samples and their corresponding **TARGET** labels.
+`TorchABC` implements the workflow illustrated above. The workflow begins with raw `data`, which undergoes a `preprocess` step. This step transforms the raw `data` into `input` samples and their corresponding `target` labels.
 
-Next, the individual **INPUT** samples are grouped into batches called **INPUTS** using a **collate** function. Similarly, the **TARGET** labels are batched into **TARGETS**. The **INPUTS** are then fed into the neural **network**, which produces **OUTPUTS**.
+Next, the individual `input` samples are grouped into batches called `inputs` using a `collate` function. Similarly, the `target` labels are batched into `targets`. The `inputs` are then fed into the `network`, which produces `outputs`.
 
-The **OUTPUTS** of the network are compared to the **TARGETS** using a **LOSS** function. The calculated loss quantifies the error between the model's predictions and the actual targets. This **LOSS** is then used by the **optimizer / scheduler** to update the parameters of the **network** to minimize the loss. The optimizer controls how the parameters are adjusted, while the scheduler can dynamically change the learning rate of the optimizer during training.
+The `outputs` are compared to the `targets` using a `loss` function. The calculated loss quantifies the error between the model's outputs and the actual targets. This `loss` is then used by the `optimizer` and `scheduler` that update the parameters of the `network` to minimize the loss. The `optimizer` controls how the parameters are adjusted, while the `scheduler` can dynamically change the learning rate of the `optimizer` during training.
 
-Finally, the raw **OUTPUTS** from the network undergo a **postprocess** step to generate the final **PREDICTIONS**. This could involve converting probabilities to class labels, applying thresholds, or other task-specific transformations. 
+Finally, the raw `outputs` from the `network` undergo a `postprocess` step to generate the final `predictions`. This could involve converting probabilities to class labels, applying thresholds, or other task-specific transformations. 
 
-**The core logic blocks** are abstract. You define their specific behavior with maximum flexibility. 
+**The core logic blocks are abstract.** You define their specific behavior with maximum flexibility. 
 
 ## Quick start
 

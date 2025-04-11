@@ -7,7 +7,7 @@ from . import TorchABC
 def main():
     parser = argparse.ArgumentParser(description="Generate template.")
     parser.add_argument('--create', type=str, required=True, help='The path to create the template file.')
-    parser.add_argument('--minimal', action='store_true', help='Generate a minimal template without docstrings.')
+    parser.add_argument('--min', action='store_true', help='Generate a minimalistic template without docstrings.')
     args = parser.parse_args()
 
     cached_properties = {}
@@ -36,7 +36,7 @@ from typing import Any, Dict
 
 class ClassName(TorchABC):"""
 
-    if not args.minimal:
+    if not args.min:
         template += """
     \"\"\"A concrete implementation of the TorchABC abstract class.
 
@@ -56,7 +56,7 @@ class ClassName(TorchABC):"""
             template += f"""
     @cached_property
     def {name}(self):"""
-            if not args.minimal:
+            if not args.min:
                 template += f"""
         \"\"\"{doc}\"\"\""""
             template += f"""
@@ -66,14 +66,14 @@ class ClassName(TorchABC):"""
             sig, doc = methods[name]
             template += f"""
     def {name}{sig}:"""
-            if not args.minimal:
+            if not args.min:
                 template += f"""
         \"\"\"{doc}\"\"\""""
             template += f"""
         {defaults[name] if name in defaults else 'raise NotImplementedError'}
     """
     
-    if not args.minimal:
+    if not args.min:
         template += f"""
 
 if __name__ == "__main__":
