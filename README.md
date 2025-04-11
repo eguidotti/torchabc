@@ -1,20 +1,20 @@
 # TorchABC
 
-[`TorchABC`](https://github.com/eguidotti/torchabc) is an abstract class for training, evaluation, and inference of pytorch models that helps you keep your code organized. It depends on [`torch`](https://pypi.org/project/torch/) only and it consists of a simple self-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
+[`TorchABC`](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py) is an abstract class for training and inference in PyTorch that helps you keep your code well organized. It is a minimalist version of [pytorch-lightning](https://pypi.org/project/pytorch-lightning/), it depends on [torch](https://pypi.org/project/torch/) only, and it consists of a simple self-contained [file](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
 
 ## Workflow
 
 ![diagram](https://github.com/user-attachments/assets/f3eac7aa-6a39-4a93-887c-7b7f8ac5f0f4)
 
-`TorchABC` implements the workflow illustrated above. The workflow begins with raw `data`, which undergoes a `preprocess` step. This step transforms the raw `data` into `input` samples and their corresponding `target` labels.
+The `TorchABC` class implements the workflow illustrated above. The workflow begins with raw `data`, which undergoes a `preprocess` step. This step transforms the raw `data` into `input` samples and their corresponding `target` labels.
 
 Next, the individual `input` samples are grouped into batches called `inputs` using a `collate` function. Similarly, the `target` labels are batched into `targets`. The `inputs` are then fed into the `network`, which produces `outputs`.
 
-The `outputs` are compared to the `targets` using a `loss` function. The calculated loss quantifies the error between the model's outputs and the actual targets. This `loss` is then used by the `optimizer` and `scheduler` that update the parameters of the `network` to minimize the loss. The `optimizer` controls how the parameters are adjusted, while the `scheduler` can dynamically change the learning rate of the `optimizer` during training.
+The `outputs` are compared to the `targets` using a `loss` function which quantifies the error between the two. The `optimizer` updates the parameters of the `network` to minimize the `loss`. The `scheduler` can dynamically change the learning rate of the `optimizer` during training.
 
 Finally, the raw `outputs` from the `network` undergo a `postprocess` step to generate the final `predictions`. This could involve converting probabilities to class labels, applying thresholds, or other task-specific transformations. 
 
-**The core logic blocks are abstract.** You define their specific behavior with maximum flexibility. 
+The core logic blocks are abstract. You define their specific behavior with maximum flexibility. 
 
 ## Quick start
 
@@ -64,7 +64,7 @@ class ClassName(TorchABC):
         return outputs
 ```
 
-Fill out the template with the dataloaders, preprocessing and postprocessing steps, the neural network, optimizer, scheduler, loss, and evaluation metrics. 
+Fill out the template with the dataloaders, preprocessing and postprocessing steps, the neural network, optimizer, scheduler, loss, and optional evaluation metrics. 
 
 #### `dataloaders`: the dataloaders for training and evaluation
 

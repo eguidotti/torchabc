@@ -38,7 +38,7 @@ class ClassName(TorchABC):"""
 
     if not args.min:
         template += """
-    \"\"\"A concrete implementation of the TorchABC abstract class.
+    \"\"\"A concrete subclass of the TorchABC abstract class.
 
     Use this template to implement your own model by following these steps:
     - replace ClassName with the name of your model,
