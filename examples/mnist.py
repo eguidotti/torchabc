@@ -182,7 +182,7 @@ class MNISTClassifier(TorchABC):
 if __name__ == "__main__":
 
     # initialize the model
-    model = MNISTClassifier(lr=0.001, batch_size=64, num_workers=4)
+    model = MNISTClassifier(lr=0.001, batch_size=64, num_workers=2)
     
     # a simple callback to save the model after each epoch
     callback = lambda self, logs: self.save(f"epoch_{logs[-1]['val/epoch']}.pth")  
