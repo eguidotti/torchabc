@@ -30,73 +30,136 @@ Generate a template using the command line interface.
 torchabc --create template.py
 ```
 
-The template is structured as follows.
+Fill out the template.
 
 ```py
 class ClassName(TorchABC):
+    """A concrete subclass of the TorchABC abstract class.
+
+    Use this template to implement your own model by following these steps:
+      - replace ClassName with the name of your model,
+      - replace this docstring with a description of your model,
+      - implement the methods below to define the core logic of your model,
+      - access the hyperparameters passed during initialization with `self.hparams`.
+    """
     
     @cached_property
     def dataloaders(self):
+        """The dataloaders.
+
+        Returns a dictionary containing multiple `DataLoader` instances. The keys of 
+        the dictionary are the names of the dataloaders (e.g., 'train', 'val', 'test'), 
+        and the values are the corresponding `torch.utils.data.DataLoader` objects.
+        """
         raise NotImplementedError
     
-    def preprocess(self, data: Any, flag: str = '') -> Any:
+    @staticmethod
+    def preprocess(data: Any, flag: str = 'predict') -> Union[torch.Tensor, Iterable[torch.Tensor]]:
+        """The preprocessing step.
+
+        Transforms the raw data of an individual sample into the corresponding tensor(s).
+
+        Parameters
+        ----------
+        data : Any
+            The raw data.
+        flag : str, optional
+            A flag indicating how to transform the data. The default transforms the 
+            input data for inference. You can use additional flags, for instance, 
+            to perform data augmentation or transform the targets during training or validation.
+
+        Returns
+        -------
+        Union[Tensor, Iterable[Tensor]]
+            The preprocessed data.
+        """
         return data
     
     @cached_property
     def network(self):
+        """The neural network.
+
+        Returns a `torch.nn.Module` whose input and output tensors assume the
+        batch size is the first dimension: (batch_size, ...).
+        """
         raise NotImplementedError
     
     @cached_property
     def optimizer(self):
+        """The optimizer for training the network.
+
+        Returns a `torch.optim.Optimizer` configured for `self.network.parameters()`.
+        """
         raise NotImplementedError
     
     @cached_property
     def scheduler(self):
+        """The learning rate scheduler for the optimizer.
+
+        Returns a `torch.optim.lr_scheduler.LRScheduler` or `torch.optim.lr_scheduler.ReduceLROnPlateau`
+        configured for `self.optimizer`.
+        """
         return None
     
-    def loss(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    @staticmethod
+    def loss(outputs: Union[torch.Tensor, Iterable[torch.Tensor]], targets: Union[torch.Tensor, Iterable[torch.Tensor]]) -> torch.Tensor:
+        """The loss function.
+
+        Compute the loss to train the neural network.
+
+        Parameters
+        ----------
+        outputs : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) returned by the forward pass of `self.network`.
+        targets : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) giving the target values.
+
+        Returns
+        -------
+        Tensor
+            A scalar tensor giving the loss value.
+        """
         raise NotImplementedError
     
-    def metrics(self, outputs: torch.Tensor, targets: torch.Tensor) -> Dict[str, float]:
+    @staticmethod
+    def metrics(outputs: Union[torch.Tensor, Iterable[torch.Tensor]], targets: Union[torch.Tensor, Iterable[torch.Tensor]]) -> Dict[str, float]:
+        """The evaluation metrics.
+
+        Compute additional evaluation metrics.
+
+        Parameters
+        ----------
+        outputs : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) returned by the forward pass of `self.network`.
+        targets : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) giving the target values.
+
+        Returns
+        -------
+        Dict[str, float]
+            A dictionary where the keys are the names of the metrics and the 
+            values are the corresponding scores.
+        """
         return {}
     
-    def postprocess(self, outputs: torch.Tensor) -> Any:
+    @staticmethod
+    def postprocess(outputs: Union[torch.Tensor, Iterable[torch.Tensor]]) -> Any:
+        """The postprocessing step.
+
+        Transforms the neural network outputs into the final predictions. 
+
+        Parameters
+        ----------
+        outputs : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) returned by the forward pass of `self.network`.
+
+        Returns
+        -------
+        Any
+            The postprocessed outputs.
+        """
         return outputs
 ```
-
-Fill out the template with the dataloaders, preprocessing and postprocessing steps, the neural network, optimizer, scheduler, loss, and optional evaluation metrics. 
-
-#### `dataloaders`: the dataloaders for training and evaluation
-
-This method defines and returns a dictionary containing the [`DataLoader`](https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader) instances for the training, validation, and testing datasets. The dictionary's keys should correspond to the names of the datasets (e.g., 'train', 'val', 'test'), and the values should be their respective `DataLoader` objects. Any transformation of the raw input data for each dataset should be implemented within the `preprocess` method of this class. The `preprocess` method should then be passed as the `transform` argument of the [`Dataset`](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset) instances.
-
-#### `preprocess`: preprocessing
-
-This method processes the data differently depending on a `flag`. When `flag` is empty (the default), the data are assumed to represent the model's input used for inference. When `flag` has a specific value, the method may perform different preprocessing steps, such as transforming the target or augmenting the input for training.
-
-#### `network`: the neural network
-
-Returns a [`Module`](https://pytorch.org/docs/stable/generated/torch.nn.Module.html) whose input and output tensors assume the batch size is the first dimension: (batch_size, ...).
-
-#### `optimizer`: the optimizer for training the network
-
-Returns an [`Optimizer`](https://pytorch.org/docs/main/optim.html#torch.optim.Optimizer) configured for the `network`.
-
-#### `scheduler`: the learning rate scheduler for the optimizer
-
-Returns a [`LRScheduler`](https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.LRScheduler.html) or [`ReduceLROnPlateau`](https://pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.ReduceLROnPlateau.html) configured for the `optimizer`.
-
-#### `loss`: loss function
-
-This method defines the loss function that quantifies the discrepancy between the neural network `outputs` and the corresponding `targets`. The loss function should be differentiable to enable backpropagation.
-
-#### `metrics`: evaluation metrics
-
-This method calculates various metrics that quantify the discrepancy between the neural network `outputs` and the corresponding `targets`. Unlike `loss`, which is primarily used for training, these metrics are only used for evaluation and do not need to be differentiable.
-
-#### `postprocess`: postprocess
-
-This method transforms the neural network outputs to generate the final predictions. 
 
 ## Usage
 
@@ -120,14 +183,12 @@ The `device` is the [`torch.device`](https://pytorch.org/docs/stable/tensor_attr
 
 #### Logger
 
-A logging function that takes a dictionary in input. The default prints to standard output. You can can easily log with [wandb](https://pypi.org/project/wandb/)
+A logging function that takes a dictionary in input. The default prints to standard output. You can can easily log with [wandb](https://pypi.org/project/wandb/) or with any other custom logger.
 
 ```py
 import wandb
 model = ClassName(logger=wandb.log)
 ```
-
-or with any other custom logger.
 
 #### Hyperparameters
 
@@ -209,6 +270,20 @@ where `data` is the raw input data. This method returns the postprocessed predic
 Get started with simple self-contained examples:
 
 - [MNIST classification](https://github.com/eguidotti/torchabc/blob/main/examples/mnist.py)
+
+### Run the examples
+
+Install the dependencies
+
+```
+poetry install --with examples
+```
+
+Run the examples by replacing `<name>` with one of the filenames in the [examples](https://github.com/eguidotti/torchabc/tree/main/examples) folder (e.g., `mnist`)
+
+```
+poetry run python examples/<name>.py
+```
 
 ## Contribute
 
