@@ -4,9 +4,11 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 import torchvision.transforms as T
 import torch.nn.functional as F
+from torch import Tensor
 from torchabc import TorchABC
 from functools import cached_property, partial
-from typing import Any, Dict
+from typing import Dict
+from PIL.Image import Image
 
 
 class MNISTClassifier(TorchABC):
@@ -14,65 +16,62 @@ class MNISTClassifier(TorchABC):
     
     @cached_property
     def dataloaders(self):
-        """The dataloaders for training and evaluation.
+        """The dataloaders.
 
-        This method defines and returns a dictionary containing the `DataLoader` instances
-        for the training, validation, and testing datasets. The keys of the dictionary
-        should correspond to the names of the datasets (e.g., 'train', 'val', 'test'),
-        and the values should be their respective `torch.utils.data.DataLoader` objects.
-
-        Any transformation of the raw input data for each dataset should be implemented
-        within the `preprocess` method of this class. The `preprocess` method should 
-        then be passed as the `transform` argument of the `Dataset` instances.
-
-        If you require custom collation logic (i.e., a specific way to merge a list of
-        samples into a batch beyond the default behavior), you should implement this
-        logic in the `collate` method of this class. The `collate` method should then be 
-        passed to the `collate_fn` argument when creating the `DataLoader` instances. 
+        Returns a dictionary containing multiple `DataLoader` instances. The keys of 
+        the dictionary are the names of the dataloaders (e.g., 'train', 'val', 'test'), 
+        and the values are the corresponding `torch.utils.data.DataLoader` objects.
         """
-        train_dataloader = DataLoader(
-            dataset=datasets.MNIST('./data', train=True, download=True, transform=partial(self.preprocess, flag='augment')), 
-            shuffle=True,
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers,
-            multiprocessing_context='fork' if torch.backends.mps.is_available() else None
+        train_dataset = datasets.MNIST(
+            './data', 
+            train=True, 
+            download=True, 
+            transform=partial(self.preprocess, flag='train')
         )
-        val_dataloader = DataLoader(
-            dataset=datasets.MNIST('./data', train=False, download=True, transform=self.preprocess), 
-            shuffle=False,
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers,
-            multiprocessing_context='fork' if torch.backends.mps.is_available() else None
+        val_dataset = datasets.MNIST(
+            './data', 
+            train=False, 
+            download=True, 
+            transform=partial(self.preprocess, flag='val')
         )
-        return {'train': train_dataloader, 'val': val_dataloader}
+        return {
+            'train': DataLoader(
+                dataset=train_dataset, 
+                shuffle=True,
+                batch_size=self.hparams.batch_size, 
+                num_workers=self.hparams.num_workers
+            ), 
+            'val': DataLoader(
+                dataset=val_dataset, 
+                shuffle=False,
+                batch_size=len(val_dataset)
+            )
+        }
     
-    def preprocess(self, data: Any, flag: str = '') -> Any:
-        """Prepare the raw data for the network.
+    @staticmethod
+    def preprocess(data: Image, flag: str = 'predict') -> Tensor:
+        """The preprocessing step.
 
-        The way this method processes the `data` depends on the `flag`.
-        When `flag` is empty (the default), the `data` are assumed to represent the 
-        model's input that is used for inference. When `flag` has a specific value, 
-        the method may perform different preprocessing steps such as transforming 
-        the target or augmenting the input for training.
+        Transforms the raw data of an individual sample into the corresponding tensor(s).
 
         Parameters
         ----------
         data : Any
-            The raw input data to be processed.
+            The raw data.
         flag : str, optional
-            A string indicating the purpose of the preprocessing. The default
-            is an empty string, meaning preprocess the model's input for inference.
+            This example uses flag = 'train' to perform data augmentation during training. 
+            When flag is 'val' or 'predict' transforms the data for inference.
 
         Returns
         -------
-        Any
+        Tensor
             The preprocessed data.
         """
         transform = T.Compose([
             T.ToTensor(),
             T.Normalize((0.1307,), (0.3081,)),
             T.RandomPerspective(
-                p=0.5 if flag == 'augment' else 0,
+                p=0.5 if flag == 'train' else 0,
                 distortion_scale=0.1
             )
         ])  
@@ -115,68 +114,66 @@ class MNISTClassifier(TorchABC):
         """
         return None
     
-    def loss(self, outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Loss function.
+    @staticmethod
+    def loss(outputs: Tensor, targets: Tensor) -> Tensor:
+        """The loss function.
 
-        This method defines the loss function that quantifies the discrepancy
-        between the neural network `outputs` and the corresponding `targets`. 
-        The loss function should be differentiable to enable backpropagation.
+        Compute the loss to train the neural network.
 
         Parameters
         ----------
-        outputs : torch.Tensor
-            The tensor containing the network's output.
-        targets : torch.Tensor
-            The targets corresponding to the outputs.
+        outputs : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) returned by the forward pass of `self.network`.
+        targets : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) giving the target values.
 
         Returns
         -------
-        torch.Tensor
-            A scalar tensor representing the computed loss value.
+        Tensor
+            A scalar tensor giving the loss value.
         """
         return F.cross_entropy(outputs, targets)
     
-    def metrics(self, outputs: torch.Tensor, targets: torch.Tensor) -> Dict[str, float]:
-        """Evaluation metrics.
+    @staticmethod
+    def metrics(outputs: torch.Tensor, targets: torch.Tensor) -> Dict[str, float]:
+        """The evaluation metrics.
 
-        This method calculates various metrics that quantify the discrepancy
-        between the neural network `outputs` and the corresponding `targets`. 
-        Unlike `self.loss`, which is primarily used for training, these metrics 
-        are only used for evaluation and they do not need to be differentiable.
+        Compute additional evaluation metrics.
 
         Parameters
         ----------
-        outputs : torch.Tensor
-            The tensor containing the network's output.
-        targets : torch.Tensor
-            The targets corresponding to the outputs.
+        outputs : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) returned by the forward pass of `self.network`.
+        targets : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) giving the target values.
 
         Returns
         -------
         Dict[str, float]
             A dictionary where the keys are the names of the metrics and the 
-            values are the corresponding metric scores.
+            values are the corresponding scores.
         """
-        accuracy = (torch.argmax(outputs, dim=1) == targets).float().mean().item()
-        return {"accuracy": accuracy}
+        return {
+            "accuracy": (torch.argmax(outputs, dim=1) == targets).float().mean().item()
+        }
     
-    def postprocess(self, outputs: torch.Tensor) -> Any:
-        """Postprocess the model's outputs.
+    @staticmethod
+    def postprocess(outputs: Tensor) -> Tensor:
+        """The postprocessing step.
 
-        This method transforms the outputs of the neural network to 
-        generate the final predictions. 
+        Transforms the neural network outputs into the final predictions. 
 
         Parameters
         ----------
-        outputs : torch.Tensor
-            The output tensor from `self.network`.
+        outputs : Union[Tensor, Iterable[Tensor]]
+            The tensor(s) returned by the forward pass of `self.network`.
 
         Returns
         -------
         Any
             The postprocessed outputs.
         """
-        return torch.argmax(outputs, dim=1).cpu().numpy()
+        return torch.argmax(outputs, dim=1)
     
 
 if __name__ == "__main__":
@@ -201,7 +198,7 @@ if __name__ == "__main__":
 
     # inference from raw data
     print("Model inference from raw data:")
-    model.dataloaders['val'].dataset.transform = None     # disable transform
-    data = model.dataloaders['val'].dataset[0]            # read PIL image and label
-    prediction = model.predict(data[0])                   # predict from PIL image    
-    print(f"Prediction {prediction} | Target {data[1]}")  # print results
+    model.dataloaders['val'].dataset.transform = None  # disable transform
+    img, cls = model.dataloaders['val'].dataset[0]     # read PIL image and label
+    pred = model.predict([img])                        # predict from PIL image    
+    print(f"Prediction {pred[0]} | Target {cls}")      # print results
