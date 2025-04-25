@@ -71,7 +71,7 @@ class TorchABC(abc.ABC):
         flag : str, optional
             A flag indicating how to transform the data. The default transforms the 
             input data for inference. You can use additional flags, for instance, 
-            to transform the targets or perform data augmentation.
+            to perform data augmentation or transform the targets during training or validation.
 
         Returns
         -------
