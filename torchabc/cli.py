@@ -25,13 +25,18 @@ def main():
                 cached_properties[name] = member.__doc__ or ""
             elif isinstance(TorchABC.__dict__.get(name), staticmethod):
                 sig = inspect.signature(member)
+                sig = sig.replace(
+                    parameters=[
+                        param.replace(annotation=inspect.Parameter.empty)
+                        for param in sig.parameters.values()
+                    ], 
+                    return_annotation=inspect.Signature.empty
+                )
                 static_methods[name] = (sig, member.__doc__ or "")
 
     template = """
-import torch
 from torchabc import TorchABC
 from functools import cached_property
-from typing import Any, Union, Iterable, Dict
 
 
 class ClassName(TorchABC):"""
@@ -72,17 +77,8 @@ class ClassName(TorchABC):"""
         \"\"\"{doc}\"\"\""""
             template += f"""
         {defaults[name] if name in defaults else 'raise NotImplementedError'}
-    """
-    
-    if not args.min:
-        template += f"""
-
-if __name__ == "__main__":
-    # Example usage
-    model = ClassName()
-    model.train(epochs=1)
 """
-
+    
     with open(args.create, "x") as f:
         f.write(template.lstrip())
         
