@@ -56,8 +56,8 @@ class MNISTClassifier(TorchABC):
 
         Parameters
         ----------
-        data : Any
-            The raw data.
+        data : Image
+            A PIL image.
         flag : str, optional
             This example uses flag = 'train' to perform data augmentation during training. 
             When flag is 'val' or 'predict' transforms the data for inference.
@@ -122,10 +122,10 @@ class MNISTClassifier(TorchABC):
 
         Parameters
         ----------
-        outputs : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) returned by the forward pass of `self.network`.
-        targets : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) giving the target values.
+        outputs : Tensor
+            The tensor returned by the forward pass of `self.network`.
+        targets : Tensor
+            The tensor giving the target values.
 
         Returns
         -------
@@ -135,17 +135,17 @@ class MNISTClassifier(TorchABC):
         return F.cross_entropy(outputs, targets)
     
     @staticmethod
-    def metrics(outputs: torch.Tensor, targets: torch.Tensor) -> Dict[str, float]:
+    def metrics(outputs: Tensor, targets: Tensor) -> Dict[str, float]:
         """The evaluation metrics.
 
         Compute additional evaluation metrics.
 
         Parameters
         ----------
-        outputs : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) returned by the forward pass of `self.network`.
-        targets : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) giving the target values.
+        outputs : Tensor
+            The tensor returned by the forward pass of `self.network`.
+        targets : Tensor
+            The tensor giving the target values.
 
         Returns
         -------
@@ -165,8 +165,8 @@ class MNISTClassifier(TorchABC):
 
         Parameters
         ----------
-        outputs : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) returned by the forward pass of `self.network`.
+        outputs : Tensor
+            The tensor returned by the forward pass of `self.network`.
 
         Returns
         -------
