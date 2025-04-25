@@ -33,6 +33,10 @@ torchabc --create template.py
 Fill out the template.
 
 ```py
+from torchabc import TorchABC
+from functools import cached_property
+
+
 class ClassName(TorchABC):
     """A concrete subclass of the TorchABC abstract class.
 
@@ -54,7 +58,7 @@ class ClassName(TorchABC):
         raise NotImplementedError
     
     @staticmethod
-    def preprocess(data: Any, flag: str = 'predict') -> Union[torch.Tensor, Iterable[torch.Tensor]]:
+    def preprocess(data, flag='predict'):
         """The preprocessing step.
 
         Transforms the raw data of an individual sample into the corresponding tensor(s).
@@ -74,7 +78,7 @@ class ClassName(TorchABC):
             The preprocessed data.
         """
         return data
-    
+
     @cached_property
     def network(self):
         """The neural network.
@@ -102,7 +106,7 @@ class ClassName(TorchABC):
         return None
     
     @staticmethod
-    def loss(outputs: Union[torch.Tensor, Iterable[torch.Tensor]], targets: Union[torch.Tensor, Iterable[torch.Tensor]]) -> torch.Tensor:
+    def loss(outputs, targets):
         """The loss function.
 
         Compute the loss to train the neural network.
@@ -120,9 +124,9 @@ class ClassName(TorchABC):
             A scalar tensor giving the loss value.
         """
         raise NotImplementedError
-    
+
     @staticmethod
-    def metrics(outputs: Union[torch.Tensor, Iterable[torch.Tensor]], targets: Union[torch.Tensor, Iterable[torch.Tensor]]) -> Dict[str, float]:
+    def metrics(outputs, targets):
         """The evaluation metrics.
 
         Compute additional evaluation metrics.
@@ -141,9 +145,9 @@ class ClassName(TorchABC):
             values are the corresponding scores.
         """
         return {}
-    
+
     @staticmethod
-    def postprocess(outputs: Union[torch.Tensor, Iterable[torch.Tensor]]) -> Any:
+    def postprocess(outputs):
         """The postprocessing step.
 
         Transforms the neural network outputs into the final predictions. 
@@ -220,9 +224,9 @@ where
 - `on` is the name of the training dataloader. Defaults to 'train'.
 - `val` is the name of the validation dataloader. Defaults to 'val'.
 - `gas` is the number of gradient accumulation steps. Defaults to 1 (no gradient accumulation).
-- `callback` is a function that is called after each epoch. It should accept two arguments: the instance itself and a list of dictionaries containing the loss and evaluation metrics. When this function returns `True`, training stops.
+- `callback` is a function that is called after each epoch. It should accept two arguments: the instance itself and a list of dictionaries containing logging info up to the current epoch. When this function returns `True`, training stops.
 
-This method returns a list of dictionaries containing the loss and evaluation metrics.
+This method returns a list of dictionaries containing logging info.
 
 ### Checkpoints
 
@@ -253,7 +257,7 @@ Evaluate the model with
 model.eval(on='test')
 ```
 
-where `on` is the name of the dataloader to evaluate on. This should be one of the keys in the `dataloaders`. This method returns a dictionary containing the evaluation metrics.
+where `on` is the name of the dataloader to evaluate on. This should be one of the keys in the `dataloaders`. This method returns a dictionary containing the loss and evaluation metrics.
 
 ### Inference
 
@@ -279,7 +283,7 @@ Install the dependencies
 poetry install --with examples
 ```
 
-Run the examples by replacing `<name>` with one of the filenames in the [examples](https://github.com/eguidotti/torchabc/tree/main/examples) folder (e.g., `mnist`)
+Run the examples by replacing `<name>` with one of the filenames in the [examples](https://github.com/eguidotti/torchabc/tree/main/examples) folder
 
 ```
 poetry run python examples/<name>.py
