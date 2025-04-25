@@ -46,8 +46,8 @@ class TorchABC(abc.ABC):
         self.logger = logger
         self.hparams = SimpleNamespace(**hparams)
 
-    @cached_property
     @abc.abstractmethod
+    @cached_property
     def dataloaders(self) -> Dict[str, torch.utils.data.DataLoader]:
         """The dataloaders.
 
@@ -80,8 +80,8 @@ class TorchABC(abc.ABC):
         """
         pass
 
-    @cached_property
     @abc.abstractmethod
+    @cached_property
     def network(self) -> torch.nn.Module:
         """The neural network.
 
@@ -90,8 +90,8 @@ class TorchABC(abc.ABC):
         """
         pass
 
-    @cached_property
     @abc.abstractmethod
+    @cached_property
     def optimizer(self) -> torch.optim.Optimizer:
         """The optimizer for training the network.
 
@@ -99,8 +99,8 @@ class TorchABC(abc.ABC):
         """
         pass
 
-    @cached_property
     @abc.abstractmethod
+    @cached_property
     def scheduler(self) -> Union[None, torch.optim.lr_scheduler.LRScheduler, torch.optim.lr_scheduler.ReduceLROnPlateau]:
         """The learning rate scheduler for the optimizer.
 
