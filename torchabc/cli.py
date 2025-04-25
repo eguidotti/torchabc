@@ -11,7 +11,7 @@ def main():
     args = parser.parse_args()
 
     cached_properties = {}
-    methods = {}
+    static_methods = {}
     defaults = {
         'scheduler': 'return None',
         'metrics': 'return {}',
@@ -23,15 +23,15 @@ def main():
         if hasattr(member, '__isabstractmethod__'):
             if isinstance(TorchABC.__dict__.get(name), cached_property):
                 cached_properties[name] = member.__doc__ or ""
-            elif callable(member):
+            elif isinstance(TorchABC.__dict__.get(name), staticmethod):
                 sig = inspect.signature(member)
-                methods[name] = (sig, member.__doc__ or "")
+                static_methods[name] = (sig, member.__doc__ or "")
 
     template = """
 import torch
 from torchabc import TorchABC
 from functools import cached_property
-from typing import Any, Dict
+from typing import Any, Union, Iterable, Dict
 
 
 class ClassName(TorchABC):"""
@@ -41,10 +41,10 @@ class ClassName(TorchABC):"""
     \"\"\"A concrete subclass of the TorchABC abstract class.
 
     Use this template to implement your own model by following these steps:
-    - replace ClassName with the name of your model,
-    - replace this docstring with a description of your model,
-    - implement the methods below to define the core logic of your model,
-    - access the hyperparameters passed during initialization with `self.hparams`.
+      - replace ClassName with the name of your model,
+      - replace this docstring with a description of your model,
+      - implement the methods below to define the core logic of your model,
+      - access the hyperparameters passed during initialization with `self.hparams`.
     \"\"\""""
     
     template += """
@@ -62,9 +62,10 @@ class ClassName(TorchABC):"""
             template += f"""
         {defaults[name] if name in defaults else 'raise NotImplementedError'}
     """
-        elif name in methods:
-            sig, doc = methods[name]
+        elif name in static_methods:
+            sig, doc = static_methods[name]
             template += f"""
+    @staticmethod
     def {name}{sig}:"""
             if not args.min:
                 template += f"""
