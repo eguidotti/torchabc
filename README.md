@@ -51,9 +51,10 @@ class ClassName(TorchABC):
     def dataloaders(self):
         """The dataloaders.
 
-        Returns a dictionary containing multiple `DataLoader` instances. The keys of 
-        the dictionary are the names of the dataloaders (e.g., 'train', 'val', 'test'), 
-        and the values are the corresponding `torch.utils.data.DataLoader` objects.
+        Returns a dictionary containing multiple `DataLoader` instances. 
+        The keys of the dictionary are the names of the dataloaders 
+        (e.g., 'train', 'val', 'test'), and the values are the corresponding 
+        `torch.utils.data.DataLoader` objects.
         """
         raise NotImplementedError
     
@@ -61,8 +62,9 @@ class ClassName(TorchABC):
     def preprocess(data, hparams, flag=''):
         """The preprocessing step.
 
-        Transforms the raw data of an individual sample into the corresponding tensor(s).
-        This method is intended to be passed as the `transform` argument of a `Dataset`.
+        Transforms the raw data of an individual sample into the 
+        corresponding tensor(s). This method is intended to be passed as 
+        the `transform` argument of a `Dataset`.
 
         Parameters
         ----------
@@ -71,9 +73,10 @@ class ClassName(TorchABC):
         hparams : dict
             The model's hyperparameters.
         flag : str, optional
-            A flag indicating how to transform the data. An empty flag must transform the 
-            input data for inference. Other flags can be used, for instance, to perform 
-            data augmentation or transform the targets during training or validation.
+            A flag indicating how to transform the data. An empty flag must 
+            transform the input data for inference. Other flags can be used, 
+            for instance, to perform data augmentation or transform the 
+            targets during training or validation.
 
         Returns
         -------
@@ -86,8 +89,8 @@ class ClassName(TorchABC):
     def collate(batch, hparams):
         """The collating step.
 
-        Collates a batch of preprocessed data samples. 
-        This method is intended to be passed as the `collate_fn` argument of a `Dataloader`.
+        Collates a batch of preprocessed data samples. This method is 
+        intended to be passed as the `collate_fn` argument of a `Dataloader`.
 
         Parameters
         ----------
@@ -107,8 +110,8 @@ class ClassName(TorchABC):
     def network(self):
         """The neural network.
 
-        Returns a `torch.nn.Module` whose input and output tensors assume the
-        batch size is the first dimension: (batch_size, ...).
+        Returns a `torch.nn.Module` whose input and output tensors assume 
+        the batch size is the first dimension: (batch_size, ...).
         """
         raise NotImplementedError
     
@@ -116,7 +119,8 @@ class ClassName(TorchABC):
     def optimizer(self):
         """The optimizer for training the network.
 
-        Returns a `torch.optim.Optimizer` configured for `self.network.parameters()`.
+        Returns a `torch.optim.Optimizer` configured for 
+        `self.network.parameters()`.
         """
         raise NotImplementedError
     
@@ -124,8 +128,9 @@ class ClassName(TorchABC):
     def scheduler(self):
         """The learning rate scheduler for the optimizer.
 
-        Returns a `torch.optim.lr_scheduler.LRScheduler` or `torch.optim.lr_scheduler.ReduceLROnPlateau`
-        configured for `self.optimizer`.
+        Returns a `torch.optim.lr_scheduler.LRScheduler` or 
+        `torch.optim.lr_scheduler.ReduceLROnPlateau` configured 
+        for `self.optimizer`.
         """
         return None
     
