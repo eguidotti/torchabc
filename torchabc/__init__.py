@@ -101,8 +101,9 @@ class TorchABC(abc.ABC):
     def collate(batch: Iterable[Tensor], hparams: dict) -> Union[Tensor, Iterable[Tensor]]:
         """The collating step.
 
-        Collates a batch of preprocessed data samples. This method is 
-        intended to be passed as the `collate_fn` argument of a `Dataloader`.
+        Collates a batch of preprocessed data samples. This method 
+        is intended to be passed as the `collate_fn` argument of a 
+        `Dataloader`.
 
         Parameters
         ----------
