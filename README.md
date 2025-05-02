@@ -89,8 +89,9 @@ class ClassName(TorchABC):
     def collate(batch, hparams):
         """The collating step.
 
-        Collates a batch of preprocessed data samples. This method is 
-        intended to be passed as the `collate_fn` argument of a `Dataloader`.
+        Collates a batch of preprocessed data samples. This method 
+        is intended to be passed as the `collate_fn` argument of a 
+        `Dataloader`.
 
         Parameters
         ----------
