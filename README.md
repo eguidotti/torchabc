@@ -8,7 +8,7 @@
 
 The `TorchABC` class implements the workflow illustrated above. The workflow begins with raw `data`, which undergoes a `preprocess` step. This step transforms the raw `data` into `input` samples and their corresponding `target` labels.
 
-Next, the individual `input` samples are grouped into batches called `inputs` using a `collate` function. Similarly, the `target` labels are batched into `targets`. The `inputs` are then fed into the `network`, which produces `outputs`.
+Next, the individual `input` samples are batched into `inputs` using a `collate` function. Similarly, the `target` labels are batched into `targets`. The `inputs` are then fed into the `network`, which produces `outputs`.
 
 The `outputs` are compared to the `targets` using a `loss` function which quantifies the error between the two. The `optimizer` updates the parameters of the `network` to minimize the `loss`. The `scheduler` can dynamically change the learning rate of the `optimizer` during training.
 
@@ -33,6 +33,7 @@ torchabc --create template.py
 Fill out the template.
 
 ```py
+import torch
 from torchabc import TorchABC
 from functools import cached_property
 
@@ -43,8 +44,7 @@ class ClassName(TorchABC):
     Use this template to implement your own model by following these steps:
       - replace ClassName with the name of your model,
       - replace this docstring with a description of your model,
-      - implement the methods below to define the core logic of your model,
-      - access the hyperparameters passed during initialization with `self.hparams`.
+      - implement the methods below to define the core logic of your model.
     """
     
     @cached_property
@@ -58,19 +58,22 @@ class ClassName(TorchABC):
         raise NotImplementedError
     
     @staticmethod
-    def preprocess(data, flag='predict'):
+    def preprocess(data, hparams, flag=''):
         """The preprocessing step.
 
         Transforms the raw data of an individual sample into the corresponding tensor(s).
+        This method is intended to be passed as the `transform` argument of a `Dataset`.
 
         Parameters
         ----------
         data : Any
             The raw data.
+        hparams : dict
+            The model's hyperparameters.
         flag : str, optional
-            A flag indicating how to transform the data. The default transforms the 
-            input data for inference. You can use additional flags, for instance, 
-            to perform data augmentation or transform the targets during training or validation.
+            A flag indicating how to transform the data. An empty flag must transform the 
+            input data for inference. Other flags can be used, for instance, to perform 
+            data augmentation or transform the targets during training or validation.
 
         Returns
         -------
@@ -78,6 +81,27 @@ class ClassName(TorchABC):
             The preprocessed data.
         """
         return data
+
+    @staticmethod
+    def collate(batch, hparams):
+        """The collating step.
+
+        Collates a batch of preprocessed data samples. 
+        This method is intended to be passed as the `collate_fn` argument of a `Dataloader`.
+
+        Parameters
+        ----------
+        batch : Iterable[Tensor]
+            The batch of preprocessed data.
+        hparams : dict
+            The model's hyperparameters.
+
+        Returns
+        -------
+        Union[Tensor, Iterable[Tensor]]
+            The collated batch.
+        """
+        return torch.utils.data.default_collate(batch)
 
     @cached_property
     def network(self):
@@ -106,7 +130,7 @@ class ClassName(TorchABC):
         return None
     
     @staticmethod
-    def loss(outputs, targets):
+    def loss(outputs, targets, hparams):
         """The loss function.
 
         Compute the loss to train the neural network.
@@ -117,6 +141,8 @@ class ClassName(TorchABC):
             The tensor(s) returned by the forward pass of `self.network`.
         targets : Union[Tensor, Iterable[Tensor]]
             The tensor(s) giving the target values.
+        hparams : dict
+            The model's hyperparameters.
 
         Returns
         -------
@@ -126,7 +152,7 @@ class ClassName(TorchABC):
         raise NotImplementedError
 
     @staticmethod
-    def metrics(outputs, targets):
+    def metrics(outputs, targets, hparams):
         """The evaluation metrics.
 
         Compute additional evaluation metrics.
@@ -137,6 +163,8 @@ class ClassName(TorchABC):
             The tensor(s) returned by the forward pass of `self.network`.
         targets : Union[Tensor, Iterable[Tensor]]
             The tensor(s) giving the target values.
+        hparams : dict
+            The model's hyperparameters.
 
         Returns
         -------
@@ -147,7 +175,7 @@ class ClassName(TorchABC):
         return {}
 
     @staticmethod
-    def postprocess(outputs):
+    def postprocess(outputs, hparams):
         """The postprocessing step.
 
         Transforms the neural network outputs into the final predictions. 
@@ -156,6 +184,8 @@ class ClassName(TorchABC):
         ----------
         outputs : Union[Tensor, Iterable[Tensor]]
             The tensor(s) returned by the forward pass of `self.network`.
+        hparams : dict
+            The model's hyperparameters.
 
         Returns
         -------
@@ -178,7 +208,8 @@ Initialize the class with
 model = ClassName(
     device: Union[str, torch.device] = None, 
     logger: Callable = print,
-    **hparams
+    hparams: dict = None,
+    **kwargs
 )
 ```
 
@@ -197,13 +228,20 @@ model = ClassName(logger=wandb.log)
 
 #### Hyperparameters
 
-You will typically use several parameters to control the behavior of `ClassName`, such as the learning rate or batch size. These parameters should be passed during the initialization
+A dictionary of hyperparameters can be passed during initialization with the argument `hparams`. The `hparams` are persistent as they will be saved in the model's checkpoints.
 
 ```py
-model = ClassName(lr=0.001, batch_size=64)
+model = ClassName(hparams={...})
 ```
 
-and are stored in the attribute `hparams` of the model. For instance, use `hparams.lr` to access the `lr` value.
+#### Additional arguments
+
+You can pass arbitrary keyword arguments to store in the class attribues. These arguments are ephemeral as they will not be saved in the model's checkpoints.
+
+```py
+model = ClassName(something=...)
+```
+
 
 ### Training
 
@@ -213,8 +251,9 @@ Train the model with
 model.train(
     epochs: int, 
     on: str = 'train', 
-    val: str = 'val', 
     gas: int = 1, 
+    val: str = 'val', 
+    reduction: Union[str, Callable] = None,
     callback: Callable = None
 )
 ```
@@ -223,8 +262,9 @@ where
 
 - `epochs` is the number of training epochs to perform.
 - `on` is the name of the training dataloader. Defaults to 'train'.
-- `val` is the name of the validation dataloader. Defaults to 'val'.
 - `gas` is the number of gradient accumulation steps. Defaults to 1 (no gradient accumulation).
+- `val` is the name of the validation dataloader. Defaults to 'val'.
+- `reduction` specifies the reduction to apply to batch statistics during validation. See `eval` (below) for further information.
 - `callback` is a function that is called after each epoch. It should accept two arguments: the instance itself and a list of dictionaries containing logging info up to the current epoch. When this function returns `True`, training stops.
 
 This method returns a list of dictionaries containing logging info.
@@ -255,10 +295,17 @@ model.train(epochs=10, val='val', callback=callback)
 Evaluate the model with
 
 ```py
-model.eval(on='test')
+model.eval(
+    on: str,
+    reduction: Union[str, Callable] = None
+)
 ```
+where 
 
-where `on` is the name of the dataloader to evaluate on. This should be one of the keys in the `dataloaders`. This method returns a dictionary containing the loss and evaluation metrics.
+- `on` is the name of the dataloader to evaluate on. 
+- `reduction` can be None, string, or callable. If None, first compute outputs for each batch, concatenate all outpus, and then compute evaluation metrics. Otherwise, first compute evaluation metrics for each batch, concatenate all metrics, and then apply a reduction. This argument specifies the reduction to apply. Possible values are `'mean'` to compute the average of the evaluation metrics across batches, `'sum'` to compute their sum, or a callable function that takes as input a list of floats and a metric name and returns a scalar.
+ 
+This method returns a dictionary containing the loss and evaluation metrics.
 
 ### Inference
 
@@ -268,7 +315,7 @@ Predict raw data with
 model.predict(data)
 ```
 
-where `data` is the raw input data. This method returns the postprocessed prediction.
+where `data` is an iterable of raw input data. This method returns the corresponding postprocessed predictions.
 
 ## Examples
 

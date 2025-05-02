@@ -1,9 +1,11 @@
 import abc
 import torch
 from torch import Tensor
-from torch.utils.data import default_collate
+from torch.nn import Module
+from torch.utils.data import DataLoader
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
 from functools import cached_property
-from types import SimpleNamespace
 from typing import Any, Iterable, Union, Dict, List, Callable
 
 
@@ -12,7 +14,8 @@ class TorchABC(abc.ABC):
     A simple abstract class for training and inference in PyTorch.
     """
 
-    def __init__(self, device: Union[str, torch.device] = None, logger: Callable = print, **hparams):
+    def __init__(self, device: Union[str, torch.device] = None, logger: Callable = print, 
+                 hparams: dict = None, **kwargs) -> None:
         """Initialize the model.
 
         Parameters
@@ -22,8 +25,12 @@ class TorchABC(abc.ABC):
             finally fall back to CPU.
         logger : Callable, optional
             A logging function that takes a dictionary in input. Defaults to print.
-        **hparams :
-            Arbitrary keyword arguments that will be stored in the `self.hparams` namespace.
+        hparams : dict, optional
+            An optional dictionary of hyperparameters. These hyperparameters are 
+            persistent as they will be saved in the model's checkpoints.
+        **kwargs :
+            Arbitrary keyword arguments. These arguments are ephemeral as they  
+            will not be saved in the model's checkpoints.
 
         Attributes
         ----------
@@ -31,8 +38,10 @@ class TorchABC(abc.ABC):
             The device the model will operate on.
         logger : Callable
             The function used for logging.
-        hparams : SimpleNamespace
-            A namespace containing the hyperparameters.
+        hparams : dict
+            The dictionary of hyperparameters.
+        **kwargs :
+            Additional attributes passed during initialization.
         """
         super().__init__()
         if device is not None:
@@ -44,11 +53,12 @@ class TorchABC(abc.ABC):
         else:
             self.device = torch.device("cpu")
         self.logger = logger
-        self.hparams = SimpleNamespace(**hparams)
+        self.hparams = hparams.copy() if hparams else {}
+        self.__dict__.update(kwargs)
 
     @abc.abstractmethod
     @cached_property
-    def dataloaders(self) -> Dict[str, torch.utils.data.DataLoader]:
+    def dataloaders(self) -> Dict[str, DataLoader]:
         """The dataloaders.
 
         Returns a dictionary containing multiple `DataLoader` instances. The keys of 
@@ -59,19 +69,22 @@ class TorchABC(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def preprocess(data: Any, flag: str = 'predict') -> Union[Tensor, Iterable[Tensor]]:
+    def preprocess(data: Any, hparams: dict, flag: str = '') -> Union[Tensor, Iterable[Tensor]]:
         """The preprocessing step.
 
         Transforms the raw data of an individual sample into the corresponding tensor(s).
+        This method is intended to be passed as the `transform` argument of a `Dataset`.
 
         Parameters
         ----------
         data : Any
             The raw data.
+        hparams : dict
+            The model's hyperparameters.
         flag : str, optional
-            A flag indicating how to transform the data. The default transforms the 
-            input data for inference. You can use additional flags, for instance, 
-            to perform data augmentation or transform the targets during training or validation.
+            A flag indicating how to transform the data. An empty flag must transform the 
+            input data for inference. Other flags can be used, for instance, to perform 
+            data augmentation or transform the targets during training or validation.
 
         Returns
         -------
@@ -80,9 +93,31 @@ class TorchABC(abc.ABC):
         """
         pass
 
+    @staticmethod
+    @abc.abstractmethod
+    def collate(batch: Iterable[Tensor], hparams: dict) -> Union[Tensor, Iterable[Tensor]]:
+        """The collating step.
+
+        Collates a batch of preprocessed data samples. 
+        This method is intended to be passed as the `collate_fn` argument of a `Dataloader`.
+
+        Parameters
+        ----------
+        batch : Iterable[Tensor]
+            The batch of preprocessed data.
+        hparams : dict
+            The model's hyperparameters.
+
+        Returns
+        -------
+        Union[Tensor, Iterable[Tensor]]
+            The collated batch.
+        """
+        pass
+
     @abc.abstractmethod
     @cached_property
-    def network(self) -> torch.nn.Module:
+    def network(self) -> Module:
         """The neural network.
 
         Returns a `torch.nn.Module` whose input and output tensors assume the
@@ -92,7 +127,7 @@ class TorchABC(abc.ABC):
 
     @abc.abstractmethod
     @cached_property
-    def optimizer(self) -> torch.optim.Optimizer:
+    def optimizer(self) -> Optimizer:
         """The optimizer for training the network.
 
         Returns a `torch.optim.Optimizer` configured for `self.network.parameters()`.
@@ -101,7 +136,7 @@ class TorchABC(abc.ABC):
 
     @abc.abstractmethod
     @cached_property
-    def scheduler(self) -> Union[None, torch.optim.lr_scheduler.LRScheduler, torch.optim.lr_scheduler.ReduceLROnPlateau]:
+    def scheduler(self) -> Union[None, LRScheduler, ReduceLROnPlateau]:
         """The learning rate scheduler for the optimizer.
 
         Returns a `torch.optim.lr_scheduler.LRScheduler` or `torch.optim.lr_scheduler.ReduceLROnPlateau`
@@ -111,7 +146,9 @@ class TorchABC(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def loss(outputs: Union[Tensor, Iterable[Tensor]], targets: Union[Tensor, Iterable[Tensor]]) -> Tensor:
+    def loss(outputs: Union[Tensor, Iterable[Tensor]], 
+             targets: Union[Tensor, Iterable[Tensor]],
+             hparams: dict) -> Tensor:
         """The loss function.
 
         Compute the loss to train the neural network.
@@ -122,6 +159,8 @@ class TorchABC(abc.ABC):
             The tensor(s) returned by the forward pass of `self.network`.
         targets : Union[Tensor, Iterable[Tensor]]
             The tensor(s) giving the target values.
+        hparams : dict
+            The model's hyperparameters.
 
         Returns
         -------
@@ -132,7 +171,9 @@ class TorchABC(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def metrics(outputs: Union[Tensor, Iterable[Tensor]], targets: Union[Tensor, Iterable[Tensor]]) -> Dict[str, float]:
+    def metrics(outputs: Union[Tensor, Iterable[Tensor]], 
+                targets: Union[Tensor, Iterable[Tensor]],
+                hparams: dict) -> Dict[str, float]:
         """The evaluation metrics.
 
         Compute additional evaluation metrics.
@@ -143,6 +184,8 @@ class TorchABC(abc.ABC):
             The tensor(s) returned by the forward pass of `self.network`.
         targets : Union[Tensor, Iterable[Tensor]]
             The tensor(s) giving the target values.
+        hparams : dict
+            The model's hyperparameters.
 
         Returns
         -------
@@ -154,7 +197,7 @@ class TorchABC(abc.ABC):
     
     @staticmethod
     @abc.abstractmethod
-    def postprocess(outputs: Union[Tensor, Iterable[Tensor]]) -> Any:
+    def postprocess(outputs: Union[Tensor, Iterable[Tensor]], hparams: dict) -> Any:
         """The postprocessing step.
 
         Transforms the neural network outputs into the final predictions. 
@@ -163,6 +206,8 @@ class TorchABC(abc.ABC):
         ----------
         outputs : Union[Tensor, Iterable[Tensor]]
             The tensor(s) returned by the forward pass of `self.network`.
+        hparams : dict
+            The model's hyperparameters.
 
         Returns
         -------
@@ -171,7 +216,8 @@ class TorchABC(abc.ABC):
         """
         pass
 
-    def train(self, epochs: int, on: str = 'train', val: str = 'val', gas: int = 1, callback: Callable = None) -> List[dict]:
+    def train(self, epochs: int, on: str = 'train', gas: int = 1, val: str = 'val', 
+              reduction: Union[str, Callable] = None, callback: Callable = None) -> List[dict]:
         """Train the model.
 
         This method sets the network to training mode, iterates through the training dataloader 
@@ -184,11 +230,14 @@ class TorchABC(abc.ABC):
         epochs : int
             The number of training epochs to perform.
         on : str, optional
-            The name of the training dataloader. Defaults to 'train'.
-        val : str, optional
-            The name of the validation dataloader. Defaults to 'val'.
+            The name of the training dataloader. Defaults to `train`.
         gas : int, optional
             The number of gradient accumulation steps. Defaults to 1 (no gradient accumulation).
+        val : str, optional
+            The name of an optional validation dataloader. Defaults to `val`.
+        reduction : Union[str, Callable]
+            Specifies the reduction to apply to batch statistics during validation. 
+            See `self.eval` for further information.
         callback : Callable, optional
             A callback function that is called after each epoch. It should accept two arguments:
             the instance itself and a list of dictionaries containing logging info up to the 
@@ -199,45 +248,47 @@ class TorchABC(abc.ABC):
         list
             A list of dictionaries containing logging info.
         """
+        if isinstance(self.scheduler, ReduceLROnPlateau):
+            if not val:
+                raise ValueError(
+                    "ReduceLROnPlateau scheduler requires a validation sample. "
+                    "Please provide a validation dataloader with the argument `val`. "
+                )
+            if not hasattr(self.scheduler, 'metric'):
+                raise ValueError(
+                    "ReduceLROnPlateau scheduler requires a metric to monitor. "
+                    "Please set self.scheduler.metric = 'name' to specify the name of the "
+                    "metric to monitor (either 'loss' or one of the keys in `self.metrics`)."
+                )
         logs, log_batch, log_epoch = [], {}, {}
         for epoch in range(1, 1 + epochs):
             loss_gas = 0
             self.network.train()
+            self.network.to(self.device)
             self.optimizer.zero_grad()
             for batch, (inputs, targets) in enumerate(self.dataloaders[on], start=1):
-                self.network.to(self.device)
                 inputs, targets = self.move((inputs, targets))
                 outputs = self.network(inputs)
-                loss = self.loss(outputs, targets)
+                loss = self.loss(outputs, targets, self.hparams)
                 loss = loss / gas
                 loss.backward()
                 loss_gas += loss.item()
                 if batch % gas == 0:
                     self.optimizer.step()
                     self.optimizer.zero_grad()
+                    metrics = self.metrics(outputs, targets, self.hparams)
                     log_batch.update({on + "/epoch": epoch, on + "/batch": batch, on + "/loss": loss_gas})
-                    log_batch.update({on + "/" + k: v for k, v in self.metrics(outputs, targets).items()})
+                    log_batch.update({on + "/" + k: v for k, v in metrics.items()})
                     self.logger(log_batch)
                     logs.append(log_batch.copy())
                     loss_gas = 0
             if val:
+                metrics = self.eval(on=val, reduction=reduction)
                 log_epoch.update({val + "/epoch": epoch})
-                log_epoch.update({val + "/" + k: v for k, v in self.eval(on=val).items()})
+                log_epoch.update({val + "/" + k: v for k, v in metrics.items()})
             if self.scheduler:
-                if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                    if not val:
-                        raise ValueError(
-                            "ReduceLROnPlateau scheduler requires validation metrics. "
-                            "Please provide a validation dataloader. "
-                        )
-                    if not hasattr(self.hparams, "plateau"):
-                        raise ValueError(
-                            "ReduceLROnPlateau scheduler requires a metric to monitor. "
-                            "Please specify the metric name during initialization by "
-                            f"using {self.__class__.__name__}(plateau='name'), "
-                            "where 'name' is either 'loss' or a key returned by `self.metrics`."
-                        )
-                    self.scheduler.step(log_epoch[val + "/" + self.hparams.plateau])
+                if isinstance(self.scheduler, ReduceLROnPlateau):
+                    self.scheduler.step(log_epoch[val + "/" + self.scheduler.metric])
                     log_epoch.update({val + "/lr": self.scheduler.get_last_lr()})
                 else:
                     self.scheduler.step()
@@ -251,7 +302,7 @@ class TorchABC(abc.ABC):
                     break
         return logs
 
-    def eval(self, on: str, reduction: Union[str, Callable] = 'mean') -> Dict[str, float]:
+    def eval(self, on: str, reduction: Union[str, Callable] = None) -> Dict[str, float]:
         """Evaluate the model.
 
         This method sets the network to evaluation mode, iterates through the given 
@@ -260,37 +311,50 @@ class TorchABC(abc.ABC):
         Parameters
         ----------
         on : str
-            The name of the dataloader to evaluate on. This is one of the keys 
-            in `self.dataloaders`.
+            The name of the dataloader to evaluate on.
         reduction : Union[str, Callable]
-            Specifies the reduction to apply to batch statistics. Possible values
-            are 'mean' to compute the average of the evaluation metrics across batches,
-            'sum' to compute their sum, or a callable function that takes as input a 
-            list of floats and a metric name and returns a scalar.
-
+            If None, first compute outputs for each batch, concatenate all outpus, 
+            and then compute evaluation metrics. Otherwise, first compute evaluation 
+            metrics for each batch, concatenate all metrics, and then apply a reduction.
+            This argument specifies the reduction to apply. Possible values are 'mean' to 
+            compute the average of the evaluation metrics across batches, 'sum' to compute 
+            their sum, or a callable function that takes as input a list of floats and a 
+            metric name and returns a scalar. 
+        
         Returns
         -------
         dict
             A dictionary containing the loss and evaluation metrics.
         """
+        outputs_lst = []
+        targets_lst = []
         metrics_lst = []
         self.network.eval()
+        self.network.to(self.device)
         with torch.no_grad():
             for inputs, targets in self.dataloaders[on]:
-                self.network.to(self.device)
                 inputs, targets = self.move((inputs, targets))
                 outputs = self.network(inputs)
-                metrics = self.metrics(outputs, targets)
-                metrics['loss'] = self.loss(outputs, targets).item()
-                metrics_lst.append(metrics)
-        if isinstance(reduction, str):
-            reduce = lambda x, _: getattr(torch, reduction)(torch.tensor(x)).item()
-        else:
-            reduce = reduction
-        return {
-            name: reduce([metrics[name] for metrics in metrics_lst], name) 
-            for name in metrics_lst[0]
-        }
+                if reduction is None:
+                    outputs_lst.append(outputs)
+                    targets_lst.append(targets)
+                else:
+                    metrics = self.metrics(outputs, targets, self.hparams)
+                    metrics['loss'] = self.loss(outputs, targets, self.hparams).item()
+                    metrics_lst.append(metrics)
+            if reduction is None:
+                outputs, targets = torch.cat(outputs_lst), torch.cat(targets_lst)
+                metrics = self.metrics(outputs, targets, self.hparams)
+                metrics['loss'] = self.loss(outputs, targets, self.hparams).item()
+                return metrics
+            if isinstance(reduction, str):
+                reduce = lambda x, _: getattr(torch, reduction)(torch.tensor(x)).item()
+            else:
+                reduce = reduction
+            return {
+                name: reduce([metrics[name] for metrics in metrics_lst], name) 
+                for name in metrics_lst[0]
+            }
 
     def predict(self, data: Iterable[Any]) -> Any:
         """Predict the raw data.
@@ -310,13 +374,13 @@ class TorchABC(abc.ABC):
             The predictions.
         """
         self.network.eval()
+        self.network.to(self.device)
         with torch.no_grad():
-            data = [self.preprocess(d, flag='predict') for d in data]
-            batch = default_collate(data)
-            self.network.to(self.device)
+            data = [self.preprocess(d, self.hparams, flag='predict') for d in data]
+            batch = self.collate(data, self.hparams)
             inputs = self.move(batch)
             outputs = self.network(inputs)
-        return self.postprocess(outputs)
+        return self.postprocess(outputs, self.hparams)
 
     def move(self, data: Union[Tensor, Iterable[Tensor]]) -> Union[Tensor, Iterable[Tensor]]:
         """Move data to the current device.
@@ -359,7 +423,7 @@ class TorchABC(abc.ABC):
             The path where to save the checkpoint.
         """
         torch.save({
-            'hparams': self.hparams.__dict__,
+            'hparams': self.hparams,
             'network_state_dict': self.network.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
@@ -375,7 +439,7 @@ class TorchABC(abc.ABC):
             The path from where to load the checkpoint.
         """
         checkpoint = torch.load(checkpoint, map_location=self.device)
-        self.hparams = SimpleNamespace(**checkpoint['hparams'])
+        self.hparams = checkpoint['hparams']
         self.network.load_state_dict(checkpoint['network_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if checkpoint['scheduler_state_dict']:

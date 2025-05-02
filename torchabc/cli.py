@@ -17,6 +17,7 @@ def main():
         'metrics': 'return {}',
         'postprocess': 'return outputs',
         'preprocess': 'return data',
+        'collate': 'return torch.utils.data.default_collate(batch)',
     }
 
     for name, member in inspect.getmembers(TorchABC):
@@ -35,6 +36,7 @@ def main():
                 static_methods[name] = (sig, member.__doc__ or "")
 
     template = """
+import torch
 from torchabc import TorchABC
 from functools import cached_property
 
@@ -48,14 +50,13 @@ class ClassName(TorchABC):"""
     Use this template to implement your own model by following these steps:
       - replace ClassName with the name of your model,
       - replace this docstring with a description of your model,
-      - implement the methods below to define the core logic of your model,
-      - access the hyperparameters passed during initialization with `self.hparams`.
+      - implement the methods below to define the core logic of your model.
     \"\"\""""
     
     template += """
     """
 
-    for name in ('dataloaders', 'preprocess', 'network', 'optimizer', 'scheduler', 'loss', 'metrics', 'postprocess'):
+    for name in ('dataloaders', 'preprocess', 'collate', 'network', 'optimizer', 'scheduler', 'loss', 'metrics', 'postprocess'):
         if name in cached_properties:
             doc = cached_properties[name]
             template += f"""
