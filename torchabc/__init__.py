@@ -254,6 +254,8 @@ class TorchABC(abc.ABC):
         list
             A list of dictionaries containing logging info.
         """
+        self.network.to(self.device)
+        logs, log_batch, log_epoch = [], {}, {}
         if isinstance(self.scheduler, ReduceLROnPlateau):
             if not val:
                 raise ValueError(
@@ -266,11 +268,9 @@ class TorchABC(abc.ABC):
                     "Please set self.scheduler.metric = 'name' to specify the name of the "
                     "metric to monitor (either 'loss' or one of the keys in `self.metrics`)."
                 )
-        logs, log_batch, log_epoch = [], {}, {}
         for epoch in range(1, 1 + epochs):
             loss_gas = 0
             self.network.train()
-            self.network.to(self.device)
             self.optimizer.zero_grad()
             for batch, (inputs, targets) in enumerate(self.dataloaders[on], start=1):
                 inputs, targets = self.move((inputs, targets))
@@ -444,9 +444,10 @@ class TorchABC(abc.ABC):
         checkpoint : str
             The path from where to load the checkpoint.
         """
-        checkpoint = torch.load(checkpoint, map_location=self.device)
+        checkpoint = torch.load(checkpoint, map_location='cpu')
         self.hparams = checkpoint['hparams']
         self.network.load_state_dict(checkpoint['network_state_dict'])
+        self.network.to(self.device)
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if checkpoint['scheduler_state_dict']:
             self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
