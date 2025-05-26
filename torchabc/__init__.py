@@ -382,7 +382,7 @@ class TorchABC(abc.ABC):
         self.network.eval()
         self.network.to(self.device)
         with torch.no_grad():
-            data = [self.preprocess(d, self.hparams, flag='predict') for d in data]
+            data = [self.preprocess(d, self.hparams) for d in data]
             batch = self.collate(data, self.hparams)
             inputs = self.move(batch)
             outputs = self.network(inputs)
