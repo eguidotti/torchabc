@@ -11,12 +11,7 @@ Create a concrete class derived from `TorchABC` following the [template](https:/
 Initialize your class with
 
 ```py
-model = ClassName(
-    device: str = None, 
-    logger: Callable = print,
-    hparams: dict = None,
-    **kwargs
-)
+model = ClassName(device = None, logger = print, hparams = None, **kwargs)
 ```
 
 where
@@ -31,12 +26,7 @@ where
 Train the model with
 
 ```py
-model.train(
-    epochs: int, 
-    gas: int = 1, 
-    on: str = 'train', 
-    val: str = 'val'
-)
+model.train(epochs, gas = 1, on = 'train', val = 'val')
 ```
 
 where
@@ -51,7 +41,7 @@ where
 Compute the evaluation metrics with
 
 ```py
-model.eval(on: str)
+model.eval(on)
 ```
 
 where 
