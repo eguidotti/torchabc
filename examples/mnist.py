@@ -114,7 +114,7 @@ class MNISTClassifier(TorchABC):
         targets = torch.cat(targets)
         return {
             "loss": F.cross_entropy(outputs, targets),
-            "accuracy": (torch.argmax(outputs, dim=1) == targets).float().mean().item()
+            "accuracy": (torch.argmax(outputs, dim=1) == targets).float().mean()
         }
                 
     @staticmethod
@@ -122,10 +122,10 @@ class MNISTClassifier(TorchABC):
         """The postprocessing step."""
         return torch.argmax(outputs, dim=1).cpu().numpy().tolist()
 
-    def checkpoint(self, epoch, train, val):
+    def checkpoint(self, epoch, metrics):
         """The checkpointing step."""
-        if epoch == 1 or val["accuracy"] > self.best_accuracy:
-            self.best_accuracy = val["accuracy"]
+        if epoch == 1 or metrics["accuracy"] > self.best_accuracy:
+            self.best_accuracy = metrics["accuracy"]
             self.save(self.path)
 
 if __name__ == "__main__":
