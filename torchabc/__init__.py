@@ -215,7 +215,7 @@ class TorchABC(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def checkpoint(self, epoch: int, train: List[dict], val: dict):
+    def checkpoint(self, epoch: int, metrics: Dict[str, float]):
         """The checkpointing step.
 
         Performs the checkpointing step at the end of each epoch.
@@ -224,9 +224,7 @@ class TorchABC(abc.ABC):
         ----------
         epoch : int
             The epoch.
-        train : List[dict]
-            List of dictionaries containing the training metrics for each batch.
-        val : dict
+        metrics : Dict[str, float]
             Dictionary containing the validation metrics.
 
         Returns
@@ -269,8 +267,6 @@ class TorchABC(abc.ABC):
                     "one of the keys returned by `self.metrics`."
                 )
         for epoch in range(1, 1 + epochs):
-            val_log = {}
-            train_logs = []
             accumulator = None
             self.network.train()
             self.optimizer.zero_grad()            
@@ -286,22 +282,21 @@ class TorchABC(abc.ABC):
                     train_log = {"epoch": epoch, "batch": batch}
                     train_log.update({k: float(v) for k, v in metrics.items()})
                     self.logger({on + "/" + k: v for k, v in train_log.items()})
-                    train_logs.append(train_log)
                     accumulator = None
             if val:
-                metrics = self.eval(on=val)
+                val_metrics = {k: float(v) for k, v in self.eval(on=val).items()}
                 val_log = {"epoch": epoch}
-                val_log.update({k: float(v) for k, v in metrics.items()})
+                val_log.update(val_metrics)
             if self.scheduler:
                 if isinstance(self.scheduler, ReduceLROnPlateau):
-                    self.scheduler.step(val_log[self.scheduler.metric])
+                    self.scheduler.step(val_metrics[self.scheduler.metric])
                     val_log.update({"lr": self.scheduler.get_last_lr()})
                 else:
                     self.scheduler.step()
                     val_log.update({"lr": self.scheduler.get_last_lr()})
-            if val_log:
+            if val:
                 self.logger({val + "/" + k: v for k, v in val_log.items()})
-            if self.checkpoint(epoch, train_logs, val_log):
+            if self.checkpoint(epoch, val_metrics if val else {}):
                 break
 
     def eval(self, on: str) -> Dict[str, float]:
