@@ -31,17 +31,6 @@ class TorchABC(abc.ABC):
         **kwargs :
             Arbitrary keyword arguments. These arguments are ephemeral as they  
             will not be saved in the model's checkpoints.
-
-        Attributes
-        ----------
-        device : torch.device
-            The device the model will operate on.
-        logger : Callable
-            The function used for logging.
-        hparams : dict
-            The dictionary of hyperparameters.
-        **kwargs :
-            Additional attributes passed during initialization.
         """
         super().__init__()
         if device is not None:
@@ -62,9 +51,8 @@ class TorchABC(abc.ABC):
         """The dataloaders.
 
         Returns a dictionary containing multiple `DataLoader` instances. 
-        The keys of the dictionary are the names of the dataloaders 
-        (e.g., 'train', 'val', 'test'), and the values are the corresponding 
-        `torch.utils.data.DataLoader` objects.
+        The keys of the dictionary are custom names (e.g., 'train', 'val', 'test'), 
+        and the values are the corresponding `torch.utils.data.DataLoader` objects.
         """
         pass
 
@@ -73,18 +61,18 @@ class TorchABC(abc.ABC):
     def preprocess(sample: Any, hparams: dict, flag: str = '') -> Union[Tensor, Iterable[Tensor]]:
         """The preprocessing step.
 
-        Transforms a raw sample into the corresponding tensor(s). 
-        This method is intended to be passed as the `transform` argument of a `Dataset`.
+        Transforms a raw sample from a `torch.utils.data.Dataset`. This method is 
+        intended to be passed as the `transform` (or similar) argument of a `Dataset`.
 
         Parameters
         ----------
         sample : Any
             The raw sample.
         hparams : dict
-            The model's hyperparameters.
+            The hyperparameters.
         flag : str, optional
             A custom flag indicating how to transform the sample. 
-            An empty flag must transform a test sample for inference.
+            An empty flag must transform the sample for inference.
 
         Returns
         -------
@@ -98,9 +86,8 @@ class TorchABC(abc.ABC):
     def collate(samples: Iterable[Tensor]) -> Union[Tensor, Iterable[Tensor]]:
         """The collating step.
 
-        Collates a batch of preprocessed data samples. This method 
-        is intended to be passed as the `collate_fn` argument of a 
-        `Dataloader`.
+        Collates a batch of preprocessed samples. This method is intended to be 
+        passed as the `collate_fn` argument of a `Dataloader`.
 
         Parameters
         ----------
@@ -151,16 +138,17 @@ class TorchABC(abc.ABC):
                    hparams: dict, accumulator: Any = None) -> Any:
         """The accumulation step.
 
-        Accumulate batch statistics.
+        Accumulates batch statistics that will be provided when calculating 
+        the loss and other metrics.
 
         Parameters
         ----------
         outputs : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) returned by the forward pass of `self.network`.
+            The outputs returned by `self.network`.
         targets : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) giving the target values.
+            The target values.
         hparams : dict
-            The model's hyperparameters.
+            The hyperparameters.
         accumulator : Any
             The previous return value of this function. 
             If None, this is the first call.
@@ -168,28 +156,27 @@ class TorchABC(abc.ABC):
         Returns
         -------
         Any
-            Accumulated batch statistics.
+            The accumulated batch statistics.
         """
         pass
 
     @staticmethod
     @abc.abstractmethod
     def metrics(accumulator: Any, hparams: dict) -> Dict[str, Union[Tensor, float]]:
-        """The loss and evaluation metrics.
+        """The evaluation metrics.
 
-        Compute the loss and additional evaluation metrics.
+        Computes the loss and additional evaluation metrics.
 
         Parameters
         ----------
         accumulator : Any
-            Accumulated batch statistics.
+            The accumulated batch statistics.
 
         Returns
         -------
-        Dict[str, float]
-            A dictionary where the keys are the names of the metrics and the 
-            values are the corresponding scores. This dictionary must contain
-            the key 'loss' that is used to train the network.
+        Dict[str, Union[Tensor, float]]
+            A dictionary of evaluation metrics. This dictionary must contain
+            the key 'loss' whose value is used to train the network.
         """
         pass
     
@@ -198,19 +185,19 @@ class TorchABC(abc.ABC):
     def postprocess(outputs: Union[Tensor, Iterable[Tensor]], hparams: dict) -> Any:
         """The postprocessing step.
 
-        Transforms the neural network outputs into the final predictions. 
+        Transforms the outputs into postprocessed predictions. 
 
         Parameters
         ----------
         outputs : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) returned by the forward pass of `self.network`.
+            The outputs returned by `self.network`.
         hparams : dict
-            The model's hyperparameters.
+            The hyperparameters.
 
         Returns
         -------
         Any
-            The postprocessed outputs.
+            The postprocessed predictions.
         """
         pass
 
@@ -218,14 +205,14 @@ class TorchABC(abc.ABC):
     def checkpoint(self, epoch: int, metrics: Dict[str, float]):
         """The checkpointing step.
 
-        Performs the checkpointing step at the end of each epoch.
+        Performs checkpointing at the end of each epoch.
 
         Parameters
         ----------
         epoch : int
-            The epoch.
+            The epoch number, starting at 1.
         metrics : Dict[str, float]
-            Dictionary containing the validation metrics.
+            Dictionary of validation metrics.
 
         Returns
         -------
@@ -236,11 +223,6 @@ class TorchABC(abc.ABC):
 
     def train(self, epochs: int, gas: int = 1, on: str = 'train', val: str = 'val') -> None:
         """Train the model.
-
-        This method sets the network to training mode, iterates through the training dataloader 
-        for the given number of epochs, performs forward and backward passes, optimizes the 
-        model parameters, and logs the training loss and metrics. It optionally performs 
-        validation after each epoch.
         
         Parameters
         ----------
@@ -302,9 +284,6 @@ class TorchABC(abc.ABC):
     def eval(self, on: str) -> Dict[str, float]:
         """Evaluate the model.
 
-        This method sets the network to evaluation mode, iterates through the given 
-        dataloader, calculates the loss and metrics, and returns the results.
-
         Parameters
         ----------
         on : str
@@ -326,11 +305,7 @@ class TorchABC(abc.ABC):
         return self.metrics(accumulator, self.hparams)
 
     def predict(self, samples: Iterable[Any]) -> Any:
-        """Predict the raw samples.
-
-        This method sets the network to evaluation mode, preprocesses and collates 
-        the raw input samples, performs a forward pass, postprocesses the outputs,
-        and returns the final predictions.
+        """Predict raw samples.
 
         Parameters
         ----------
@@ -340,7 +315,7 @@ class TorchABC(abc.ABC):
         Returns
         -------
         Any
-            The predictions.
+            The postprocessed predictions.
         """
         self.network.eval()
         self.network.to(self.device)
@@ -353,11 +328,6 @@ class TorchABC(abc.ABC):
 
     def move(self, data: Union[Tensor, Iterable[Tensor]]) -> Union[Tensor, Iterable[Tensor]]:
         """Move data to the current device.
-
-        This method moves the data to the device specified by `self.device`. It supports 
-        moving tensors, or lists, tuples, and dictionaries of tensors. For custom data 
-        structures, overwrite this function to implement the necessary logic for moving 
-        the data to the device.
 
         Parameters
         ----------
@@ -384,7 +354,7 @@ class TorchABC(abc.ABC):
             )
 
     def save(self, checkpoint: str) -> None:
-        """Save checkpoint.
+        """Save the model to a checkpoint.
 
         Parameters
         ----------
@@ -399,12 +369,12 @@ class TorchABC(abc.ABC):
         }, checkpoint)
 
     def load(self, checkpoint: str) -> None:
-        """Load checkpoint.
+        """Load the model from a checkpoint.
 
         Parameters
         ----------
         checkpoint : str
-            The path from where to load the checkpoint.
+            The path of the checkpoint.
         """
         checkpoint = torch.load(checkpoint, map_location='cpu')
         self.hparams = checkpoint['hparams']
