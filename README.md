@@ -48,20 +48,6 @@ where
 
 - `on` is the name of the dataloader to evaluate on. 
 
-### Checkpoints
-
-Save the model to a checkpoint.
-
-```py
-model.save("checkpoint.pth")
-```
-
-Load the model from a checkpoint.
-
-```py
-model.load("checkpoint.pth")
-```
-
 ### Inference
 
 Predict with
@@ -73,6 +59,19 @@ model.predict(samples)
 where 
 
 - `samples` is an iterable of raw data samples. 
+
+### Checkpoints
+
+Save and load the model.
+
+```py
+model.save(checkpoint)
+model.load(checkpoint)
+```
+
+where 
+
+- `checkpoint` is the path to the model checkpoint.
 
 ## Quick start
 
@@ -110,9 +109,8 @@ class ClassName(TorchABC):
         """The dataloaders.
 
         Returns a dictionary containing multiple `DataLoader` instances. 
-        The keys of the dictionary are the names of the dataloaders 
-        (e.g., 'train', 'val', 'test'), and the values are the corresponding 
-        `torch.utils.data.DataLoader` objects.
+        The keys of the dictionary are custom names (e.g., 'train', 'val', 'test'), 
+        and the values are the corresponding `torch.utils.data.DataLoader` objects.
         """
         raise NotImplementedError
     
@@ -120,18 +118,18 @@ class ClassName(TorchABC):
     def preprocess(sample, hparams, flag=''):
         """The preprocessing step.
 
-        Transforms a raw sample into the corresponding tensor(s). 
-        This method is intended to be passed as the `transform` argument of a `Dataset`.
+        Transforms a raw sample from a `torch.utils.data.Dataset`. This method is 
+        intended to be passed as the `transform` (or similar) argument of a `Dataset`.
 
         Parameters
         ----------
         sample : Any
             The raw sample.
         hparams : dict
-            The model's hyperparameters.
+            The hyperparameters.
         flag : str, optional
             A custom flag indicating how to transform the sample. 
-            An empty flag must transform a test sample for inference.
+            An empty flag must transform the sample for inference.
 
         Returns
         -------
@@ -144,9 +142,8 @@ class ClassName(TorchABC):
     def collate(samples):
         """The collating step.
 
-        Collates a batch of preprocessed data samples. This method 
-        is intended to be passed as the `collate_fn` argument of a 
-        `Dataloader`.
+        Collates a batch of preprocessed samples. This method is intended to be 
+        passed as the `collate_fn` argument of a `Dataloader`.
 
         Parameters
         ----------
@@ -192,16 +189,17 @@ class ClassName(TorchABC):
     def accumulate(outputs, targets, hparams, accumulator=None):
         """The accumulation step.
 
-        Accumulate batch statistics.
+        Accumulates batch statistics that will be provided when calculating 
+        the loss and other metrics.
 
         Parameters
         ----------
         outputs : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) returned by the forward pass of `self.network`.
+            The outputs returned by `self.network`.
         targets : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) giving the target values.
+            The target values.
         hparams : dict
-            The model's hyperparameters.
+            The hyperparameters.
         accumulator : Any
             The previous return value of this function. 
             If None, this is the first call.
@@ -209,27 +207,26 @@ class ClassName(TorchABC):
         Returns
         -------
         Any
-            Accumulated batch statistics.
+            The accumulated batch statistics.
         """
         raise NotImplementedError
 
     @staticmethod
     def metrics(accumulator, hparams):
-        """The loss and evaluation metrics.
+        """The evaluation metrics.
 
-        Compute the loss and additional evaluation metrics.
+        Computes the loss and additional evaluation metrics.
 
         Parameters
         ----------
         accumulator : Any
-            Accumulated batch statistics.
+            The accumulated batch statistics.
 
         Returns
         -------
-        Dict[str, float]
-            A dictionary where the keys are the names of the metrics and the 
-            values are the corresponding scores. This dictionary must contain
-            the key 'loss' that is used to train the network.
+        Dict[str, Union[Tensor, float]]
+            A dictionary of evaluation metrics. This dictionary must contain
+            the key 'loss' whose value is used to train the network.
         """
         raise NotImplementedError
 
@@ -237,33 +234,33 @@ class ClassName(TorchABC):
     def postprocess(outputs, hparams):
         """The postprocessing step.
 
-        Transforms the neural network outputs into the final predictions. 
+        Transforms the outputs into postprocessed predictions. 
 
         Parameters
         ----------
         outputs : Union[Tensor, Iterable[Tensor]]
-            The tensor(s) returned by the forward pass of `self.network`.
+            The outputs returned by `self.network`.
         hparams : dict
-            The model's hyperparameters.
+            The hyperparameters.
 
         Returns
         -------
         Any
-            The postprocessed outputs.
+            The postprocessed predictions.
         """
         return outputs
 
     def checkpoint(self, epoch, metrics):
         """The checkpointing step.
 
-        Performs the checkpointing step at the end of each epoch.
+        Performs checkpointing at the end of each epoch.
 
         Parameters
         ----------
         epoch : int
-            The epoch.
+            The epoch number, starting at 1.
         metrics : Dict[str, float]
-            Dictionary containing the validation metrics.
+            Dictionary of validation metrics.
 
         Returns
         -------
