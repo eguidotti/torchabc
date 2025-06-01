@@ -10,21 +10,20 @@ def main():
     parser.add_argument('--min', action='store_true', help='Generate a minimalistic template without docstrings.')
     args = parser.parse_args()
 
-    cached_properties = {}
-    static_methods = {}
+    methods, cached_properties = {}, {}
     defaults = {
         'scheduler': 'return None',
-        'metrics': 'return {}',
         'postprocess': 'return outputs',
-        'preprocess': 'return data',
-        'collate': 'return torch.utils.data.default_collate(batch)',
+        'preprocess': 'return sample',
+        'checkpoint': 'return False',
+        'collate': 'return torch.utils.data.default_collate(samples)',
     }
 
     for name, member in inspect.getmembers(TorchABC):
         if hasattr(member, '__isabstractmethod__'):
             if isinstance(TorchABC.__dict__.get(name), cached_property):
                 cached_properties[name] = member.__doc__ or ""
-            elif isinstance(TorchABC.__dict__.get(name), staticmethod):
+            else:
                 sig = inspect.signature(member)
                 sig = sig.replace(
                     parameters=[
@@ -33,7 +32,8 @@ def main():
                     ], 
                     return_annotation=inspect.Signature.empty
                 )
-                static_methods[name] = (sig, member.__doc__ or "")
+                static = isinstance(TorchABC.__dict__.get(name), staticmethod)
+                methods[name] = (sig, member.__doc__ or "", static)
 
     template = """
 import torch
@@ -56,7 +56,7 @@ class ClassName(TorchABC):"""
     template += """
     """
 
-    for name in ('dataloaders', 'preprocess', 'collate', 'network', 'optimizer', 'scheduler', 'loss', 'metrics', 'postprocess'):
+    for name in ('dataloaders', 'preprocess', 'collate', 'network', 'optimizer', 'scheduler', 'accumulate', 'metrics', 'postprocess', 'checkpoint'):
         if name in cached_properties:
             doc = cached_properties[name]
             template += f"""
@@ -68,10 +68,12 @@ class ClassName(TorchABC):"""
             template += f"""
         {defaults[name] if name in defaults else 'raise NotImplementedError'}
     """
-        elif name in static_methods:
-            sig, doc = static_methods[name]
+        elif name in methods:
+            sig, doc, static = methods[name]
+            if static:
+                template += f"""
+    @staticmethod"""
             template += f"""
-    @staticmethod
     def {name}{sig}:"""
             if not args.min:
                 template += f"""
