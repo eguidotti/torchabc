@@ -128,6 +128,7 @@ class MNISTClassifier(TorchABC):
             self.best_accuracy = metrics["accuracy"]
             self.save(self.path)
 
+
 if __name__ == "__main__":
 
     # set up hyperparameters
