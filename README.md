@@ -17,7 +17,7 @@ model = ClassName(device = None, logger = print, hparams = None, **kwargs)
 where
 
 - `device` is the [`torch.device`](https://pytorch.org/docs/stable/tensor_attributes.html#torch.device) to use. Defaults to `None`, which will try CUDA, then MPS, and finally fall back to CPU.
-- `logger` is a logging function that takes a dictionary in input. The default prints to standard output. You can can easily log with [wandb](https://pypi.org/project/wandb/) or with any other custom logger.
+- `logger` is a logging function that takes a dictionary in input. The default prints to standard output. You can can easily log with [wandb](https://docs.wandb.ai/ref/python/log/) or with any other custom logger.
 - `hparams` is a dictionary of hyperparameters used internally by your class. These hyperparameters are persistent as they will be saved in the model's checkpoints.
 - `kwargs` are additional arguments to store in the class attributes. These arguments are ephemeral as they will not be saved in the model's checkpoints.
 
