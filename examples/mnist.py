@@ -98,23 +98,23 @@ class MNISTClassifier(TorchABC):
         return None
     
     @staticmethod
-    def accumulate(outputs, targets, hparams, accumulator=None):
-        """The accumulation step."""
-        if accumulator is None:
-            accumulator = [], []
-        accumulator[0].append(outputs)
-        accumulator[1].append(targets)
-        return accumulator
-
-    @staticmethod
-    def metrics(accumulator, hparams):
-        """The loss and evaluation metrics."""
-        outputs, targets = accumulator
-        outputs = torch.cat(outputs)
-        targets = torch.cat(targets)
+    def loss(outputs, targets, hparams):
+        """The loss function."""
         return {
             "loss": F.cross_entropy(outputs, targets),
-            "accuracy": (torch.argmax(outputs, dim=1) == targets).float().mean()
+            "y_pred": torch.argmax(outputs, dim=1),
+            "y_true": targets,
+        }
+
+    @staticmethod
+    def metrics(batches, hparams):
+        """The evaluation metrics."""
+        loss = torch.stack([batch['loss'] for batch in batches])
+        y_pred = torch.cat([batch['y_pred'] for batch in batches])
+        y_true = torch.cat([batch['y_true'] for batch in batches])
+        return {
+            "loss": loss.mean().item(),
+            "accuracy": (y_pred == y_true).float().mean().item(),
         }
                 
     @staticmethod

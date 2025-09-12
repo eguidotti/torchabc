@@ -17,6 +17,7 @@ def main():
         'preprocess': 'return sample',
         'checkpoint': 'return False',
         'collate': 'return torch.utils.data.default_collate(samples)',
+        'metrics': 'return {"loss": sum(batch["loss"] for batch in batches) / len(batches)}',
     }
 
     for name, member in inspect.getmembers(TorchABC):
@@ -56,7 +57,7 @@ class ClassName(TorchABC):"""
     template += """
     """
 
-    for name in ('dataloaders', 'preprocess', 'collate', 'network', 'optimizer', 'scheduler', 'accumulate', 'metrics', 'postprocess', 'checkpoint'):
+    for name in ('dataloaders', 'preprocess', 'collate', 'network', 'optimizer', 'scheduler', 'loss', 'metrics', 'postprocess', 'checkpoint'):
         if name in cached_properties:
             doc = cached_properties[name]
             template += f"""

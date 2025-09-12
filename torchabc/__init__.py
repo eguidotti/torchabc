@@ -6,7 +6,8 @@ from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
 from functools import cached_property
-from typing import Any, Iterable, Union, Dict, List, Callable
+from collections import deque
+from typing import Any, Iterable, Union, Callable
 
 
 class TorchABC(abc.ABC):
@@ -47,10 +48,10 @@ class TorchABC(abc.ABC):
 
     @abc.abstractmethod
     @cached_property
-    def dataloaders(self) -> Dict[str, DataLoader]:
+    def dataloaders(self) -> dict[str, DataLoader]:
         """The dataloaders.
 
-        Returns a dictionary containing multiple `DataLoader` instances. 
+        Return a dictionary containing multiple `DataLoader` instances. 
         The keys of the dictionary are custom names (e.g., 'train', 'val', 'test'), 
         and the values are the corresponding `torch.utils.data.DataLoader` objects.
         """
@@ -61,8 +62,8 @@ class TorchABC(abc.ABC):
     def preprocess(sample: Any, hparams: dict, flag: str = '') -> Union[Tensor, Iterable[Tensor]]:
         """The preprocessing step.
 
-        Transforms a raw sample from a `torch.utils.data.Dataset`. This method is 
-        intended to be passed as the `transform` (or similar) argument of a `Dataset`.
+        Transform a raw sample of a `torch.utils.data.Dataset`. This method is 
+        intended to be passed as the `transform` argument of a `Dataset`.
 
         Parameters
         ----------
@@ -86,7 +87,7 @@ class TorchABC(abc.ABC):
     def collate(samples: Iterable[Tensor]) -> Union[Tensor, Iterable[Tensor]]:
         """The collating step.
 
-        Collates a batch of preprocessed samples. This method is intended to be 
+        Collate a batch of preprocessed samples. This method is intended to be 
         passed as the `collate_fn` argument of a `Dataloader`.
 
         Parameters
@@ -106,7 +107,7 @@ class TorchABC(abc.ABC):
     def network(self) -> Module:
         """The neural network.
 
-        Returns a `torch.nn.Module` whose input and output tensors assume 
+        Return a `torch.nn.Module` whose input and output tensors assume 
         the batch size is the first dimension: (batch_size, ...).
         """
         pass
@@ -116,7 +117,7 @@ class TorchABC(abc.ABC):
     def optimizer(self) -> Optimizer:
         """The optimizer for training the network.
 
-        Returns a `torch.optim.Optimizer` configured for 
+        Return a `torch.optim.Optimizer` configured for 
         `self.network.parameters()`.
         """
         pass
@@ -126,7 +127,7 @@ class TorchABC(abc.ABC):
     def scheduler(self) -> Union[None, LRScheduler, ReduceLROnPlateau]:
         """The learning rate scheduler for the optimizer.
 
-        Returns a `torch.optim.lr_scheduler.LRScheduler` or 
+        Return a `torch.optim.lr_scheduler.LRScheduler` or 
         `torch.optim.lr_scheduler.ReduceLROnPlateau` configured 
         for `self.optimizer`.
         """
@@ -134,12 +135,12 @@ class TorchABC(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def accumulate(outputs: Union[Tensor, Iterable[Tensor]], targets: Union[Tensor, Iterable[Tensor]],
-                   hparams: dict, accumulator: Any = None) -> Any:
-        """The accumulation step.
+    def loss(outputs: Union[Tensor, Iterable[Tensor]], 
+             targets: Union[Tensor, Iterable[Tensor]], 
+             hparams: dict) -> dict[str, Any]:
+        """The loss function.
 
-        Accumulates batch statistics that will be provided when calculating 
-        the loss and other metrics.
+        Compute the loss and optional extra info for a single batch.
 
         Parameters
         ----------
@@ -149,34 +150,30 @@ class TorchABC(abc.ABC):
             The target values.
         hparams : dict
             The hyperparameters.
-        accumulator : Any
-            The previous return value of this function. 
-            If None, this is the first call.
 
         Returns
         -------
-        Any
-            The accumulated batch statistics.
+        dict[str, Any]
+            Dictionary with key 'loss' and optional extra keys.
         """
         pass
 
     @staticmethod
     @abc.abstractmethod
-    def metrics(accumulator: Any, hparams: dict) -> Dict[str, Union[Tensor, float]]:
+    def metrics(batches: deque[dict[str, Any]], hparams: dict) -> dict[str, Any]:
         """The evaluation metrics.
 
-        Computes the loss and additional evaluation metrics.
+        Compute evaluation metrics from multiple batches.
 
         Parameters
         ----------
-        accumulator : Any
-            The accumulated batch statistics.
+        batches : deque[dict[str, Any]]
+            List of dictionaries returned by `self.loss`.
 
         Returns
         -------
-        Dict[str, Union[Tensor, float]]
-            A dictionary of evaluation metrics. This dictionary must contain
-            the key 'loss' whose value is used to train the network.
+        dict[str, Any]
+            Dictionary of evaluation metrics.
         """
         pass
     
@@ -185,7 +182,7 @@ class TorchABC(abc.ABC):
     def postprocess(outputs: Union[Tensor, Iterable[Tensor]], hparams: dict) -> Any:
         """The postprocessing step.
 
-        Transforms the outputs into postprocessed predictions. 
+        Transform the outputs into postprocessed predictions. 
 
         Parameters
         ----------
@@ -202,17 +199,17 @@ class TorchABC(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def checkpoint(self, epoch: int, metrics: Dict[str, float]):
+    def checkpoint(self, epoch: int, metrics: dict[str, Any]):
         """The checkpointing step.
 
-        Performs checkpointing at the end of each epoch.
+        Perform checkpointing at the end of each epoch.
 
         Parameters
         ----------
         epoch : int
             The epoch number, starting at 1.
-        metrics : Dict[str, float]
-            Dictionary of validation metrics.
+        metrics : dict[str, float]
+            The dictionary of validation metrics.
 
         Returns
         -------
@@ -221,7 +218,8 @@ class TorchABC(abc.ABC):
         """
         pass
 
-    def train(self, epochs: int, gas: int = 1, on: str = 'train', val: str = 'val') -> None:
+    def train(self, epochs: int, gas: int = 1, mas: int = None, 
+              on: str = 'train', val: str = 'val') -> None:
         """Train the model.
         
         Parameters
@@ -229,11 +227,16 @@ class TorchABC(abc.ABC):
         epochs : int
             The number of training epochs to perform.
         gas : int, optional
-            The number of gradient accumulation steps.
+            Gradient accumulation steps. The number of batches to process 
+            before updating the model weights.
+        mas : int, optional
+            Metrics accumulation steps. The number of batches to process 
+            before computing and logging metrics. Defaults to `gas` if not 
+            specified or set to zero.
         on : str, optional
-            The name of the training dataloader.
+            The name of the dataloader to use for training.
         val : str, optional
-            The name of an optional validation dataloader.
+            The name of an optional dataloader to use for validation.
         """
         self.network.to(self.device)
         if isinstance(self.scheduler, ReduceLROnPlateau):
@@ -248,25 +251,27 @@ class TorchABC(abc.ABC):
                     "Please set self.scheduler.metric = 'name' where name is " \
                     "one of the keys returned by `self.metrics`."
                 )
+        mas = mas or gas
+        batches = deque(maxlen=mas)
         for epoch in range(1, 1 + epochs):
-            accumulator = None
             self.network.train()
             self.optimizer.zero_grad()            
-            for batch, (inputs, targets) in enumerate(self.dataloaders[on], start=1):
+            for i, (inputs, targets) in enumerate(self.dataloaders[on], start=1):
                 inputs, targets = self.move((inputs, targets))
                 outputs = self.network(inputs)
-                accumulator = self.accumulate(outputs, targets, self.hparams, accumulator)
-                if batch % gas == 0:
-                    metrics = self.metrics(accumulator, self.hparams)
-                    metrics["loss"].backward()
+                batch = self.loss(outputs, targets, self.hparams)
+                (batch['loss'] / gas).backward()
+                batches.append(self.detach(batch))
+                if i % gas == 0:
                     self.optimizer.step()
                     self.optimizer.zero_grad()
-                    train_log = {"epoch": epoch, "batch": batch}
-                    train_log.update({k: float(v) for k, v in metrics.items()})
+                if i % mas == 0:
+                    train_metrics = self.metrics(batches, self.hparams)
+                    train_log = {"epoch": epoch, "batch": i}
+                    train_log.update(train_metrics)
                     self.logger({on + "/" + k: v for k, v in train_log.items()})
-                    accumulator = None
             if val:
-                val_metrics = {k: float(v) for k, v in self.eval(on=val).items()}
+                val_metrics = self.eval(on=val)
                 val_log = {"epoch": epoch}
                 val_log.update(val_metrics)
             if self.scheduler:
@@ -281,7 +286,7 @@ class TorchABC(abc.ABC):
             if self.checkpoint(epoch, val_metrics if val else {}):
                 break
 
-    def eval(self, on: str) -> Dict[str, float]:
+    def eval(self, on: str) -> dict[str, float]:
         """Evaluate the model.
 
         Parameters
@@ -292,17 +297,18 @@ class TorchABC(abc.ABC):
         Returns
         -------
         dict
-            A dictionary containing the loss and evaluation metrics.
+            The dictionary of evaluation metrics.
         """
-        accumulator = None
+        batches = deque()
         self.network.eval()
         self.network.to(self.device)
         with torch.no_grad():
             for inputs, targets in self.dataloaders[on]:
                 inputs, targets = self.move((inputs, targets))
                 outputs = self.network(inputs)
-                accumulator = self.accumulate(outputs, targets, self.hparams, accumulator)
-        return self.metrics(accumulator, self.hparams)
+                batch = self.loss(outputs, targets, self.hparams)
+                batches.append(self.detach(batch))
+        return self.metrics(batches, self.hparams)
 
     def predict(self, samples: Iterable[Any]) -> Any:
         """Predict raw samples.
@@ -321,8 +327,7 @@ class TorchABC(abc.ABC):
         self.network.to(self.device)
         with torch.no_grad():
             samples = [self.preprocess(sample, self.hparams) for sample in samples]
-            batch = self.collate(samples)
-            inputs = self.move(batch)
+            inputs = self.move(self.collate(samples))
             outputs = self.network(inputs)
         return self.postprocess(outputs, self.hparams)
 
@@ -351,6 +356,33 @@ class TorchABC(abc.ABC):
             raise TypeError(
                 f"Unsupported data type: {type(data)}. "
                 "Please implement the method `move` for custom data types."
+            )
+
+    def detach(self, data: Union[Tensor, Iterable[Tensor]]) -> Union[Tensor, Iterable[Tensor]]:
+        """Detach tensors from the current graph.
+
+        Parameters
+        ----------
+        data : Union[Tensor, Iterable[Tensor]]
+            The data to detach from the current graph.
+
+        Returns
+        -------
+        Union[Tensor, Iterable[Tensor]]
+            The data detached from the current graph.
+        """
+        if isinstance(data, Tensor):
+            return data.detach()
+        elif isinstance(data, list):
+            return [self.detach(item) for item in data]
+        elif isinstance(data, tuple):
+            return tuple(self.detach(item) for item in data)
+        elif isinstance(data, dict):
+            return {key: self.detach(value) for key, value in data.items()}
+        else:
+            raise TypeError(
+                f"Unsupported data type: {type(data)}. "
+                "Please implement the method `detach` for custom data types."
             )
 
     def save(self, checkpoint: str) -> None:
