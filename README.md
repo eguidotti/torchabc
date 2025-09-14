@@ -10,7 +10,7 @@ This package has no extra dependencies beyond PyTorch and it consists of a simpl
 
 The `TorchABC` class structures a project into the following main steps:
 
-![diagram](https://github.com/user-attachments/assets/f3eac7aa-6a39-4a93-887c-7b7f8ac5f0f4)
+![diagram](https://github.com/user-attachments/assets/dd5abbb4-c28b-4477-a196-6eef5ad2ec2e)
 
 1. **Dataloaders** - load raw data samples.
 2. **Preprocess** – transform raw samples.
