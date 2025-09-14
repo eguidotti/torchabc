@@ -28,10 +28,10 @@ class TorchABC(abc.ABC):
             A logging function that takes a dictionary in input. Defaults to print.
         hparams : dict, optional
             An optional dictionary of hyperparameters. These hyperparameters are 
-            persistent as they will be saved in the model's checkpoints.
+            persistent and they will be saved in the model's checkpoint.
         **kwargs :
-            Arbitrary keyword arguments. These arguments are ephemeral as they  
-            will not be saved in the model's checkpoints.
+            Arbitrary keyword arguments. These arguments are ephemeral and they  
+            will not be saved in the model's checkpoint.
         """
         super().__init__()
         if device is not None:
@@ -45,6 +45,121 @@ class TorchABC(abc.ABC):
         self.logger = logger
         self.hparams = hparams.copy() if hparams else {}
         self.__dict__.update(kwargs)
+
+    def train(self, epochs: int, gas: int = 1, mas: int = None, 
+              on: str = 'train', val: str = 'val', checkpoint: str = None) -> None:
+        """Train the model.
+        
+        Parameters
+        ----------
+        epochs : int
+            The number of training epochs to perform.
+        gas : int, optional
+            Gradient accumulation steps. The number of batches to process 
+            before updating the model weights.
+        mas : int, optional
+            Metrics accumulation steps. The number of batches to process 
+            before computing and logging metrics. Defaults to `gas` if not 
+            specified or set to zero.
+        on : str, optional
+            The name of the dataloader to use for training.
+        val : str, optional
+            The name of an optional dataloader to use for validation.
+        checkpoint : str, optional
+            The path where to save the checkpoint.
+        """
+        self.network.to(self.device)
+        if isinstance(self.scheduler, ReduceLROnPlateau):
+            if not val:
+                raise ValueError(
+                    "ReduceLROnPlateau scheduler requires a validation sample. "
+                    "Please provide a validation dataloader with the argument `val`. "
+                )
+            if not hasattr(self.scheduler, 'metric'):
+                raise ValueError(
+                    "ReduceLROnPlateau scheduler requires a metric to monitor. "
+                    "Please set self.scheduler.metric = 'name' where name is " \
+                    "one of the keys returned by `self.metrics`."
+                )
+        mas = mas or gas
+        batches = deque(maxlen=mas)
+        for epoch in range(1, 1 + epochs):
+            self.network.train()
+            self.optimizer.zero_grad()            
+            for i, (inputs, targets) in enumerate(self.dataloaders[on], start=1):
+                inputs, targets = self.move((inputs, targets))
+                outputs = self.network(inputs)
+                batch = self.loss(outputs, targets, self.hparams)
+                self.backward(batch, gas)
+                batches.append(self.detach(batch))
+                if i % gas == 0:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+                if i % mas == 0:
+                    train_metrics = self.metrics(batches, self.hparams)
+                    train_log = {"epoch": epoch, "batch": i}
+                    train_log.update(train_metrics)
+                    self.logger({on + "/" + k: v for k, v in train_log.items()})
+            if val:
+                val_metrics = self.eval(on=val)
+                val_log = {"epoch": epoch}
+                val_log.update(val_metrics)
+            if self.scheduler:
+                if isinstance(self.scheduler, ReduceLROnPlateau):
+                    self.scheduler.step(val_metrics[self.scheduler.metric])
+                    val_log.update({"lr": self.scheduler.get_last_lr()})
+                else:
+                    self.scheduler.step()
+                    val_log.update({"lr": self.scheduler.get_last_lr()})
+            if val:
+                self.logger({val + "/" + k: v for k, v in val_log.items()})
+            if self.checkpoint(checkpoint, epoch, val_metrics if val else {}):
+                break
+
+    def eval(self, on: str) -> dict[str, float]:
+        """Evaluate the model.
+
+        Parameters
+        ----------
+        on : str
+            The name of the dataloader to evaluate on.
+        
+        Returns
+        -------
+        dict
+            The dictionary of evaluation metrics.
+        """
+        batches = deque()
+        self.network.eval()
+        self.network.to(self.device)
+        with torch.no_grad():
+            for inputs, targets in self.dataloaders[on]:
+                inputs, targets = self.move((inputs, targets))
+                outputs = self.network(inputs)
+                batch = self.loss(outputs, targets, self.hparams)
+                batches.append(self.detach(batch))
+        return self.metrics(batches, self.hparams)
+
+    def __call__(self, samples: Iterable[Any]) -> Any:
+        """Predict raw samples.
+
+        Parameters
+        ----------
+        samples : Iterable[Any]
+            The raw input samples.
+
+        Returns
+        -------
+        Any
+            The postprocessed predictions.
+        """
+        self.network.eval()
+        self.network.to(self.device)
+        with torch.no_grad():
+            samples = [self.preprocess(sample, self.hparams) for sample in samples]
+            inputs = self.move(self.collate(samples))
+            outputs = self.network(inputs)
+        return self.postprocess(outputs, self.hparams)
 
     @abc.abstractmethod
     @cached_property
@@ -122,7 +237,6 @@ class TorchABC(abc.ABC):
         """
         pass
 
-    @abc.abstractmethod
     @cached_property
     def scheduler(self) -> Union[None, LRScheduler, ReduceLROnPlateau]:
         """The learning rate scheduler for the optimizer.
@@ -131,7 +245,7 @@ class TorchABC(abc.ABC):
         `torch.optim.lr_scheduler.ReduceLROnPlateau` configured 
         for `self.optimizer`.
         """
-        pass
+        return None
 
     @staticmethod
     @abc.abstractmethod
@@ -158,8 +272,19 @@ class TorchABC(abc.ABC):
         """
         pass
 
+    def backward(self, batch: dict[str, Any], gas: int) -> None:
+        """The backpropagation step.
+
+        Parameters
+        ----------
+        batch : dict[str, Any]
+            Dictionary returned by `self.loss`.
+        gas : int
+            The number of gradient accumulation steps.
+        """
+        return (batch['loss'] / gas).backward()
+
     @staticmethod
-    @abc.abstractmethod
     def metrics(batches: deque[dict[str, Any]], hparams: dict) -> dict[str, Any]:
         """The evaluation metrics.
 
@@ -175,8 +300,35 @@ class TorchABC(abc.ABC):
         dict[str, Any]
             Dictionary of evaluation metrics.
         """
-        pass
-    
+        return {
+            "loss": sum(batch["loss"] for batch in batches) / len(batches)
+        }
+
+    def checkpoint(self, path: str, epoch: int, metrics: dict[str, Any]):
+        """The checkpointing step.
+
+        Perform checkpointing at the end of each epoch.
+
+        Parameters
+        ----------
+        path : str
+            File path used to save checkpoints. 
+        epoch : int
+            The epoch number, starting at 1.
+        metrics : dict[str, float]
+            The dictionary of validation metrics.
+
+        Returns
+        -------
+        bool
+            If this function returns True, training stops.
+        """
+        if epoch == 1 or metrics["loss"] < self.min_loss:
+            self.min_loss = metrics["loss"]
+            if path is not None:
+                self.save(path)
+        return False
+
     @staticmethod
     @abc.abstractmethod
     def postprocess(outputs: Union[Tensor, Iterable[Tensor]], hparams: dict) -> Any:
@@ -197,139 +349,6 @@ class TorchABC(abc.ABC):
             The postprocessed predictions.
         """
         pass
-
-    @abc.abstractmethod
-    def checkpoint(self, epoch: int, metrics: dict[str, Any]):
-        """The checkpointing step.
-
-        Perform checkpointing at the end of each epoch.
-
-        Parameters
-        ----------
-        epoch : int
-            The epoch number, starting at 1.
-        metrics : dict[str, float]
-            The dictionary of validation metrics.
-
-        Returns
-        -------
-        bool
-            If this function returns True, training stops.
-        """
-        pass
-
-    def train(self, epochs: int, gas: int = 1, mas: int = None, 
-              on: str = 'train', val: str = 'val') -> None:
-        """Train the model.
-        
-        Parameters
-        ----------
-        epochs : int
-            The number of training epochs to perform.
-        gas : int, optional
-            Gradient accumulation steps. The number of batches to process 
-            before updating the model weights.
-        mas : int, optional
-            Metrics accumulation steps. The number of batches to process 
-            before computing and logging metrics. Defaults to `gas` if not 
-            specified or set to zero.
-        on : str, optional
-            The name of the dataloader to use for training.
-        val : str, optional
-            The name of an optional dataloader to use for validation.
-        """
-        self.network.to(self.device)
-        if isinstance(self.scheduler, ReduceLROnPlateau):
-            if not val:
-                raise ValueError(
-                    "ReduceLROnPlateau scheduler requires a validation sample. "
-                    "Please provide a validation dataloader with the argument `val`. "
-                )
-            if not hasattr(self.scheduler, 'metric'):
-                raise ValueError(
-                    "ReduceLROnPlateau scheduler requires a metric to monitor. "
-                    "Please set self.scheduler.metric = 'name' where name is " \
-                    "one of the keys returned by `self.metrics`."
-                )
-        mas = mas or gas
-        batches = deque(maxlen=mas)
-        for epoch in range(1, 1 + epochs):
-            self.network.train()
-            self.optimizer.zero_grad()            
-            for i, (inputs, targets) in enumerate(self.dataloaders[on], start=1):
-                inputs, targets = self.move((inputs, targets))
-                outputs = self.network(inputs)
-                batch = self.loss(outputs, targets, self.hparams)
-                (batch['loss'] / gas).backward()
-                batches.append(self.detach(batch))
-                if i % gas == 0:
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
-                if i % mas == 0:
-                    train_metrics = self.metrics(batches, self.hparams)
-                    train_log = {"epoch": epoch, "batch": i}
-                    train_log.update(train_metrics)
-                    self.logger({on + "/" + k: v for k, v in train_log.items()})
-            if val:
-                val_metrics = self.eval(on=val)
-                val_log = {"epoch": epoch}
-                val_log.update(val_metrics)
-            if self.scheduler:
-                if isinstance(self.scheduler, ReduceLROnPlateau):
-                    self.scheduler.step(val_metrics[self.scheduler.metric])
-                    val_log.update({"lr": self.scheduler.get_last_lr()})
-                else:
-                    self.scheduler.step()
-                    val_log.update({"lr": self.scheduler.get_last_lr()})
-            if val:
-                self.logger({val + "/" + k: v for k, v in val_log.items()})
-            if self.checkpoint(epoch, val_metrics if val else {}):
-                break
-
-    def eval(self, on: str) -> dict[str, float]:
-        """Evaluate the model.
-
-        Parameters
-        ----------
-        on : str
-            The name of the dataloader to evaluate on.
-        
-        Returns
-        -------
-        dict
-            The dictionary of evaluation metrics.
-        """
-        batches = deque()
-        self.network.eval()
-        self.network.to(self.device)
-        with torch.no_grad():
-            for inputs, targets in self.dataloaders[on]:
-                inputs, targets = self.move((inputs, targets))
-                outputs = self.network(inputs)
-                batch = self.loss(outputs, targets, self.hparams)
-                batches.append(self.detach(batch))
-        return self.metrics(batches, self.hparams)
-
-    def predict(self, samples: Iterable[Any]) -> Any:
-        """Predict raw samples.
-
-        Parameters
-        ----------
-        samples : Iterable[Any]
-            The raw input samples.
-
-        Returns
-        -------
-        Any
-            The postprocessed predictions.
-        """
-        self.network.eval()
-        self.network.to(self.device)
-        with torch.no_grad():
-            samples = [self.preprocess(sample, self.hparams) for sample in samples]
-            inputs = self.move(self.collate(samples))
-            outputs = self.network(inputs)
-        return self.postprocess(outputs, self.hparams)
 
     def move(self, data: Union[Tensor, Iterable[Tensor]]) -> Union[Tensor, Iterable[Tensor]]:
         """Move data to the current device.

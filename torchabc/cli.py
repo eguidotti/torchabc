@@ -12,12 +12,9 @@ def main():
 
     methods, cached_properties = {}, {}
     defaults = {
-        'scheduler': 'return None',
         'postprocess': 'return outputs',
         'preprocess': 'return sample',
-        'checkpoint': 'return False',
         'collate': 'return torch.utils.data.default_collate(samples)',
-        'metrics': 'return {"loss": sum(batch["loss"] for batch in batches) / len(batches)}',
     }
 
     for name, member in inspect.getmembers(TorchABC):
@@ -42,14 +39,14 @@ from torchabc import TorchABC
 from functools import cached_property
 
 
-class ClassName(TorchABC):"""
+class MyModel(TorchABC):"""
 
     if not args.min:
         template += """
     \"\"\"A concrete subclass of the TorchABC abstract class.
 
     Use this template to implement your own model by following these steps:
-      - replace ClassName with the name of your model,
+      - replace MyModel with the name of your model,
       - replace this docstring with a description of your model,
       - implement the methods below to define the core logic of your model.
     \"\"\""""
@@ -57,7 +54,7 @@ class ClassName(TorchABC):"""
     template += """
     """
 
-    for name in ('dataloaders', 'preprocess', 'collate', 'network', 'optimizer', 'scheduler', 'loss', 'metrics', 'postprocess', 'checkpoint'):
+    for name in ('dataloaders', 'preprocess', 'collate', 'network', 'loss', 'optimizer', 'postprocess'):
         if name in cached_properties:
             doc = cached_properties[name]
             template += f"""

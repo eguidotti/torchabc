@@ -13,7 +13,6 @@ class MNISTClassifier(TorchABC):
     
     @cached_property
     def dataloaders(self):
-        """The dataloaders."""
         train_dataset = datasets.MNIST(
             './data', 
             train=True, 
@@ -44,7 +43,6 @@ class MNISTClassifier(TorchABC):
     
     @staticmethod
     def preprocess(sample, hparams, flag=''):
-        """The preprocessing step."""
         transform = T.Compose([
             T.ToTensor(),
             T.Normalize((0.1307,), (0.3081,)),
@@ -58,12 +56,10 @@ class MNISTClassifier(TorchABC):
 
     @staticmethod
     def collate(samples):
-        """The collating step."""
         return torch.utils.data.default_collate(samples)
 
     @cached_property
     def network(self):
-        """The neural network."""
         class SimpleCNN(nn.Module):
 
             def __init__(self, hparams):
@@ -89,17 +85,10 @@ class MNISTClassifier(TorchABC):
 
     @cached_property
     def optimizer(self):
-        """The optimizer for training the network."""
         return torch.optim.Adam(self.network.parameters(), lr=self.hparams['optimizer']['lr'])
-    
-    @cached_property
-    def scheduler(self):
-        """The learning rate scheduler for the optimizer."""
-        return None
-    
+
     @staticmethod
     def loss(outputs, targets, hparams):
-        """The loss function."""
         return {
             "loss": F.cross_entropy(outputs, targets),
             "y_pred": torch.argmax(outputs, dim=1),
@@ -108,7 +97,6 @@ class MNISTClassifier(TorchABC):
 
     @staticmethod
     def metrics(batches, hparams):
-        """The evaluation metrics."""
         loss = torch.stack([batch['loss'] for batch in batches])
         y_pred = torch.cat([batch['y_pred'] for batch in batches])
         y_true = torch.cat([batch['y_true'] for batch in batches])
@@ -117,16 +105,14 @@ class MNISTClassifier(TorchABC):
             "accuracy": (y_pred == y_true).float().mean().item(),
         }
                 
-    @staticmethod
-    def postprocess(outputs, hparams):
-        """The postprocessing step."""
-        return torch.argmax(outputs, dim=1).cpu().numpy().tolist()
-
-    def checkpoint(self, epoch, metrics):
-        """The checkpointing step."""
+    def checkpoint(self, path, epoch, metrics):
         if epoch == 1 or metrics["accuracy"] > self.best_accuracy:
             self.best_accuracy = metrics["accuracy"]
-            self.save(self.path)
+            self.save(path)
+
+    @staticmethod
+    def postprocess(outputs, hparams):
+        return torch.argmax(outputs, dim=1).cpu().numpy().tolist()
 
 
 if __name__ == "__main__":
@@ -150,12 +136,12 @@ if __name__ == "__main__":
     }
 
     # initialize model
-    model = MNISTClassifier(hparams=hparams, path="mnist.pth")
+    model = MNISTClassifier(hparams=hparams)
     
-    # training and validation
-    model.train(epochs=3, on='train', val='val')
+    # training and validation with checkpoint selection
+    model.train(epochs=3, on='train', val='val', checkpoint="mnist.pth")
     
-    # load checkpoint
+    # load selected checkpoint
     model.load("mnist.pth")
     
     # read raw data
@@ -163,5 +149,5 @@ if __name__ == "__main__":
     img, cls = model.dataloaders['val'].dataset[0]     # read PIL image and label
 
     # inference from raw data
-    pred = model.predict([img])                        # predict from PIL image    
+    pred = model([img])                                # predict from PIL image    
     print(f"Prediction {pred[0]} | Target {cls}")      # print results
