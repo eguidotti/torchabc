@@ -27,11 +27,9 @@ class TorchABC(abc.ABC):
         logger : Callable, optional
             A logging function that takes a dictionary in input. Defaults to print.
         hparams : dict, optional
-            An optional dictionary of hyperparameters. These hyperparameters are 
-            persistent and they will be saved in the model's checkpoint.
+            An optional dictionary of hyperparameters.
         **kwargs :
-            Arbitrary keyword arguments. These arguments are ephemeral and they  
-            will not be saved in the model's checkpoint.
+            Arbitrary keyword arguments.
         """
         super().__init__()
         if device is not None:
@@ -372,10 +370,7 @@ class TorchABC(abc.ABC):
         elif isinstance(data, dict):
             return {key: self.move(value) for key, value in data.items()}
         else:
-            raise TypeError(
-                f"Unsupported data type: {type(data)}. "
-                "Please implement the method `move` for custom data types."
-            )
+            return data
 
     def detach(self, data: Union[Tensor, Iterable[Tensor]]) -> Union[Tensor, Iterable[Tensor]]:
         """Detach tensors from the current graph.
@@ -399,10 +394,7 @@ class TorchABC(abc.ABC):
         elif isinstance(data, dict):
             return {key: self.detach(value) for key, value in data.items()}
         else:
-            raise TypeError(
-                f"Unsupported data type: {type(data)}. "
-                "Please implement the method `detach` for custom data types."
-            )
+            return data
 
     def save(self, checkpoint: str) -> None:
         """Save the model to a checkpoint.
@@ -413,7 +405,6 @@ class TorchABC(abc.ABC):
             The path where to save the checkpoint.
         """
         torch.save({
-            'hparams': self.hparams,
             'network_state_dict': self.network.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
@@ -428,7 +419,6 @@ class TorchABC(abc.ABC):
             The path of the checkpoint.
         """
         checkpoint = torch.load(checkpoint, map_location='cpu')
-        self.hparams = checkpoint['hparams']
         self.network.load_state_dict(checkpoint['network_state_dict'])
         self.network.to(self.device)
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
