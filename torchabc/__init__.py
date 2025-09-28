@@ -45,7 +45,7 @@ class TorchABC(abc.ABC):
         self.__dict__.update(kwargs)
 
     def train(self, epochs: int, gas: int = 1, mas: int = None, 
-              on: str = 'train', val: str = 'val', checkpoint: str = None) -> None:
+              on: str = 'train', val: str = 'val', out: str = None) -> None:
         """Train the model.
         
         Parameters
@@ -57,14 +57,13 @@ class TorchABC(abc.ABC):
             before updating the model weights.
         mas : int, optional
             Metrics accumulation steps. The number of batches to process 
-            before computing and logging metrics. Defaults to `gas` if not 
-            specified or set to zero.
+            before computing and logging metrics. Defaults to `gas`.
         on : str, optional
             The name of the dataloader to use for training.
         val : str, optional
             The name of an optional dataloader to use for validation.
-        checkpoint : str, optional
-            The path where to save the checkpoint.
+        out : str, optional
+            The output path to save checkpoints.
         """
         self.network.to(self.device)
         if isinstance(self.scheduler, ReduceLROnPlateau):
@@ -111,7 +110,7 @@ class TorchABC(abc.ABC):
                     val_log.update({"lr": self.scheduler.get_last_lr()})
             if val:
                 self.logger({val + "/" + k: v for k, v in val_log.items()})
-            if self.checkpoint(checkpoint, epoch, val_metrics if val else {}):
+            if self.checkpoint(out, epoch, val_metrics if val else {}):
                 break
 
     def eval(self, on: str) -> dict[str, float]:

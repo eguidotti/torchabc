@@ -139,7 +139,7 @@ if __name__ == "__main__":
     model = MNISTClassifier(hparams=hparams)
     
     # training and validation with checkpoint selection
-    model.train(epochs=3, on='train', val='val', checkpoint="mnist.pth")
+    model.train(epochs=3, on='train', val='val', out="mnist.pth")
     
     # load selected checkpoint
     model.load("mnist.pth")
