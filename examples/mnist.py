@@ -105,10 +105,10 @@ class MNISTClassifier(TorchABC):
             "accuracy": (y_pred == y_true).float().mean().item(),
         }
                 
-    def checkpoint(self, path, epoch, metrics):
+    def checkpoint(self, epoch, metrics, out):
         if epoch == 1 or metrics["accuracy"] > self.best_accuracy:
             self.best_accuracy = metrics["accuracy"]
-            self.save(path)
+            self.save(out)
 
     @staticmethod
     def postprocess(outputs, hparams):
