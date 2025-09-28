@@ -110,7 +110,7 @@ class TorchABC(abc.ABC):
                     val_log.update({"lr": self.scheduler.get_last_lr()})
             if val:
                 self.logger({val + "/" + k: v for k, v in val_log.items()})
-            if self.checkpoint(out, epoch, val_metrics if val else {}):
+            if self.checkpoint(epoch, val_metrics if val else {}, out):
                 break
 
     def eval(self, on: str) -> dict[str, float]:
@@ -301,19 +301,19 @@ class TorchABC(abc.ABC):
             "loss": sum(batch["loss"] for batch in batches) / len(batches)
         }
 
-    def checkpoint(self, path: str, epoch: int, metrics: dict[str, Any]):
+    def checkpoint(self, epoch: int, metrics: dict[str, Any], out: str):
         """The checkpointing step.
 
         Perform checkpointing at the end of each epoch.
 
         Parameters
         ----------
-        path : str
-            File path used to save checkpoints. 
         epoch : int
             The epoch number, starting at 1.
         metrics : dict[str, float]
             The dictionary of validation metrics.
+        out : str
+            Output path to save checkpoints. 
 
         Returns
         -------
@@ -322,8 +322,8 @@ class TorchABC(abc.ABC):
         """
         if epoch == 1 or metrics["loss"] < self.min_loss:
             self.min_loss = metrics["loss"]
-            if path is not None:
-                self.save(path)
+            if out is not None:
+                self.save(out)
         return False
 
     @staticmethod
