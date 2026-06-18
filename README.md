@@ -22,7 +22,7 @@ The [`TorchABC`](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init
 8. **Metrics** - compute evaluation metrics from multiple batches.
 9. **Postprocess** - transform outputs into predictions.
 
-Each step corresponds to an abstract method in `TorchABC`. To use `TorchABC`, create a concrete subclass and implement these methods.
+Each step corresponds to an abstract method in `TorchABC`. To use `TorchABC`, create a concrete subclass.
 
 ## Quick start
 
@@ -292,7 +292,7 @@ model.load("checkpoint.pth")
 Run predictions on raw input samples.
 
 ```python
-preds = model(samples)
+preds = model(rawdata)
 ```
 
 ## Examples
