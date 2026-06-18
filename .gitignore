@@ -179,3 +179,5 @@ poetry.lock
 data
 assets
 wandb
+mnist.pth
+template.py

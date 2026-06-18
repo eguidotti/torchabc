@@ -54,7 +54,7 @@ class TorchABC(abc.ABC):
             The number of training epochs to perform.
         gas : int, optional
             Gradient accumulation steps. The number of batches to process 
-            before updating the model weights.
+            before backpropagating the loss.
         mas : int, optional
             Metrics accumulation steps. The number of batches to process 
             before computing and logging metrics. Defaults to `gas`.
@@ -79,21 +79,21 @@ class TorchABC(abc.ABC):
                     "one of the keys returned by `self.metrics`."
                 )
         mas = mas or gas
-        batches = deque(maxlen=mas)
+        losses = deque(maxlen=mas)
         for epoch in range(1, 1 + epochs):
             self.network.train()
             self.optimizer.zero_grad()            
             for i, (inputs, targets) in enumerate(self.dataloaders[on], start=1):
                 inputs, targets = self.move((inputs, targets))
                 outputs = self.network(inputs)
-                batch = self.loss(outputs, targets, self.hparams)
-                self.backward(batch, gas)
-                batches.append(self.detach(batch))
+                loss = self.loss(outputs, targets, self.hparams)
+                self.backward(loss, gas)
+                losses.append(self.detach(loss))
                 if i % gas == 0:
                     self.optimizer.step()
                     self.optimizer.zero_grad()
                 if i % mas == 0:
-                    train_metrics = self.metrics(batches, self.hparams)
+                    train_metrics = self.metrics(losses, self.hparams)
                     train_log = {"epoch": epoch, "batch": i}
                     train_log.update(train_metrics)
                     self.logger({on + "/" + k: v for k, v in train_log.items()})
@@ -126,16 +126,16 @@ class TorchABC(abc.ABC):
         dict
             The dictionary of evaluation metrics.
         """
-        batches = deque()
+        losses = deque()
         self.network.eval()
         self.network.to(self.device)
         with torch.no_grad():
             for inputs, targets in self.dataloaders[on]:
                 inputs, targets = self.move((inputs, targets))
                 outputs = self.network(inputs)
-                batch = self.loss(outputs, targets, self.hparams)
-                batches.append(self.detach(batch))
-        return self.metrics(batches, self.hparams)
+                loss = self.loss(outputs, targets, self.hparams)
+                losses.append(self.detach(loss))
+        return self.metrics(losses, self.hparams)
 
     def __call__(self, samples: Iterable[Any]) -> Any:
         """Predict raw samples.
@@ -153,7 +153,10 @@ class TorchABC(abc.ABC):
         self.network.eval()
         self.network.to(self.device)
         with torch.no_grad():
-            samples = [self.preprocess(sample, self.hparams) for sample in samples]
+            samples = [
+                self.preprocess(sample, self.hparams, flag='') 
+                for sample in samples
+            ]
             inputs = self.move(self.collate(samples))
             outputs = self.network(inputs)
         return self.postprocess(outputs, self.hparams)
@@ -174,8 +177,9 @@ class TorchABC(abc.ABC):
     def preprocess(sample: Any, hparams: dict, flag: str = '') -> Union[Tensor, Iterable[Tensor]]:
         """The preprocessing step.
 
-        Transform a raw sample of a `torch.utils.data.Dataset`. This method is 
-        intended to be passed as the `transform` argument of a `Dataset`.
+        Transform a raw sample. This method is called when preprocessing raw samples 
+        for inference. It can also be used in `self.dataloaders` with custom flags 
+        for different behaviour (e.g., see examples/mnist.py for data augmentation).
 
         Parameters
         ----------
@@ -184,8 +188,9 @@ class TorchABC(abc.ABC):
         hparams : dict
             The hyperparameters.
         flag : str, optional
-            A custom flag indicating how to transform the sample. 
-            An empty flag must transform the sample for inference.
+            When flag is empty, this method transforms a raw sample for inference.
+            A custom flag can be used to specify a different behavior when using
+            this method in `self.dataloaders` (e.g., see examples/mnist.py).
 
         Returns
         -------
@@ -199,8 +204,7 @@ class TorchABC(abc.ABC):
     def collate(samples: Iterable[Tensor]) -> Union[Tensor, Iterable[Tensor]]:
         """The collating step.
 
-        Collate a batch of preprocessed samples. This method is intended to be 
-        passed as the `collate_fn` argument of a `Dataloader`.
+        Collate a batch of preprocessed samples.
 
         Parameters
         ----------
@@ -234,6 +238,7 @@ class TorchABC(abc.ABC):
         """
         pass
 
+    @abc.abstractmethod
     @cached_property
     def scheduler(self) -> Union[None, LRScheduler, ReduceLROnPlateau]:
         """The learning rate scheduler for the optimizer.
@@ -242,7 +247,7 @@ class TorchABC(abc.ABC):
         `torch.optim.lr_scheduler.ReduceLROnPlateau` configured 
         for `self.optimizer`.
         """
-        return None
+        pass
 
     @staticmethod
     @abc.abstractmethod
@@ -251,7 +256,8 @@ class TorchABC(abc.ABC):
              hparams: dict) -> dict[str, Any]:
         """The loss function.
 
-        Compute the loss and optional extra info for a single batch.
+        Compute the loss and optional extra information for a single batch.
+        The loss is used for training and all information are passed to `self.metrics`.
 
         Parameters
         ----------
@@ -269,27 +275,28 @@ class TorchABC(abc.ABC):
         """
         pass
 
-    def backward(self, batch: dict[str, Any], gas: int) -> None:
+    def backward(self, loss: dict[str, Any], gas: int) -> None:
         """The backpropagation step.
 
         Parameters
         ----------
-        batch : dict[str, Any]
+        loss : dict[str, Any]
             Dictionary returned by `self.loss`.
         gas : int
             The number of gradient accumulation steps.
         """
-        return (batch['loss'] / gas).backward()
+        return (loss['loss'] / gas).backward()
 
     @staticmethod
-    def metrics(batches: deque[dict[str, Any]], hparams: dict) -> dict[str, Any]:
+    @abc.abstractmethod
+    def metrics(losses: deque[dict[str, Any]], hparams: dict) -> dict[str, Any]:
         """The evaluation metrics.
 
-        Compute evaluation metrics from multiple batches.
+        Compute evaluation metrics from the losses on multiple batches.
 
         Parameters
         ----------
-        batches : deque[dict[str, Any]]
+        losses : deque[dict[str, Any]]
             List of dictionaries returned by `self.loss`.
 
         Returns
@@ -297,9 +304,7 @@ class TorchABC(abc.ABC):
         dict[str, Any]
             Dictionary of evaluation metrics.
         """
-        return {
-            "loss": sum(batch["loss"] for batch in batches) / len(batches)
-        }
+        pass
 
     def checkpoint(self, epoch: int, metrics: dict[str, Any], out: str):
         """The checkpointing step.

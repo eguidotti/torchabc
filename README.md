@@ -30,13 +30,11 @@ Install the package.
 pip install torchabc
 ```
 
-Generate a template using the command line interface.
+Generate a minimalistic template to fill out:
 
 ```bash
 torchabc --create template.py --min
 ```
-
-Fill out the template by implementing the methods below. The documentation of each method is available [here](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py).
 
 ```py
 import torch
@@ -76,96 +74,215 @@ class MyModel(TorchABC):
 
 ```
 
+The full template with the documentation can be created with:
+
+```bash
+torchabc --create template.py
+```
+
+```python
+import torch
+from torchabc import TorchABC
+from functools import cached_property
+
+
+class MyModel(TorchABC):
+    """A concrete subclass of the TorchABC abstract class.
+
+    Use this template to implement your own model by following these steps:
+      - replace MyModel with the name of your model,
+      - replace this docstring with a description of your model,
+      - implement the methods below to define the core logic of your model.
+    """
+    
+    @cached_property
+    def dataloaders(self):
+        """The dataloaders.
+
+        Return a dictionary containing multiple `DataLoader` instances. 
+        The keys of the dictionary are custom names (e.g., 'train', 'val', 'test'), 
+        and the values are the corresponding `torch.utils.data.DataLoader` objects.
+        """
+        raise NotImplementedError
+    
+    @staticmethod
+    def preprocess(sample, hparams, flag=''):
+        """The preprocessing step.
+
+        Transform a raw sample. This method is called when preprocessing raw samples 
+        for inference. It can also be used in `self.dataloaders` with custom flags 
+        for different behaviour (e.g., see examples/mnist.py for data augmentation).
+
+        Parameters
+        ----------
+        sample : Any
+            The raw sample.
+        hparams : dict
+            The hyperparameters.
+        flag : str, optional
+            When flag is empty, this method transforms a raw sample for inference.
+            A custom flag can be used to specify a different behavior when using
+            this method in `self.dataloaders` (e.g., see examples/mnist.py).
+
+        Returns
+        -------
+        Union[Tensor, Iterable[Tensor]]
+            The preprocessed sample.
+        """
+        return sample
+
+    @staticmethod
+    def collate(samples):
+        """The collating step.
+
+        Collate a batch of preprocessed samples.
+
+        Parameters
+        ----------
+        samples : Iterable[Tensor]
+            The preprocessed samples.
+
+        Returns
+        -------
+        Union[Tensor, Iterable[Tensor]]
+            The batch of collated samples.
+        """
+        return torch.utils.data.default_collate(samples)
+
+    @cached_property
+    def network(self):
+        """The neural network.
+
+        Return a `torch.nn.Module` whose input and output tensors assume 
+        the batch size is the first dimension: (batch_size, ...).
+        """
+        raise NotImplementedError
+    
+    @cached_property
+    def optimizer(self):
+        """The optimizer for training the network.
+
+        Return a `torch.optim.Optimizer` configured for 
+        `self.network.parameters()`.
+        """
+        raise NotImplementedError
+    
+    @cached_property
+    def scheduler(self):
+        """The learning rate scheduler for the optimizer.
+
+        Return a `torch.optim.lr_scheduler.LRScheduler` or 
+        `torch.optim.lr_scheduler.ReduceLROnPlateau` configured 
+        for `self.optimizer`.
+        """
+        return None
+    
+    @staticmethod
+    def loss(outputs, targets, hparams):
+        """The loss function.
+
+        Compute the loss and optional extra information for a single batch.
+        The loss is used for training and all information are passed to `self.metrics`.
+
+        Parameters
+        ----------
+        outputs : Union[Tensor, Iterable[Tensor]]
+            The outputs returned by `self.network`.
+        targets : Union[Tensor, Iterable[Tensor]]
+            The target values.
+        hparams : dict
+            The hyperparameters.
+
+        Returns
+        -------
+        dict[str, Any]
+            Dictionary with key 'loss' and optional extra keys.
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    def metrics(losses, hparams):
+        """The evaluation metrics.
+
+        Compute evaluation metrics from the losses on multiple batches.
+
+        Parameters
+        ----------
+        losses : deque[dict[str, Any]]
+            List of dictionaries returned by `self.loss`.
+
+        Returns
+        -------
+        dict[str, Any]
+            Dictionary of evaluation metrics.
+        """
+        return {"loss": sum(loss["loss"] for loss in losses) / len(losses)}
+
+    @staticmethod
+    def postprocess(outputs, hparams):
+        """The postprocessing step.
+
+        Transform the outputs into postprocessed predictions. 
+
+        Parameters
+        ----------
+        outputs : Union[Tensor, Iterable[Tensor]]
+            The outputs returned by `self.network`.
+        hparams : dict
+            The hyperparameters.
+
+        Returns
+        -------
+        Any
+            The postprocessed predictions.
+        """
+        return outputs
+```
+
 ## Usage
 
 Once a subclass of `TorchABC` is implemented, it can be used for training, evaluation, checkpointing, and inference.
 
 ### Initialization
 
+Initialize the model.
+
 ```python
 model = MyModel()
 ```
 
-Initialize the model.
-
 ### Training
+
+Train the model for 5 epochs using the `train` and `val` dataloaders.
 
 ```python
 model.train(epochs=5, on="train", val="val")
 ```
 
-Train the model for 5 epochs using the `train` and `val` dataloaders.
-
 ### Evaluation
+
+Evaluate on the `test` dataloader and return metrics.
 
 ```python
 metrics = model.eval(on="test")
 ```
 
-Evaluate on the `test` dataloader and return metrics.
-
 ### Checkpoints
+
+Save and restore the model state.
 
 ```python
 model.save("checkpoint.pth")
 model.load("checkpoint.pth")
 ```
 
-Save and restore the model state.
-
 ### Inference
+
+Run predictions on raw input samples.
 
 ```python
 preds = model(samples)
 ```
-
-Run predictions on raw input samples.
-
-# API Reference
-
-The `TorchABC` class defines a standard workflow for PyTorch projects. Some methods are [abstract](https://github.com/eguidotti/torchabc/tree/main?tab=readme-ov-file#abstract-methods) (must be implemented in subclasses), others are [optional](https://github.com/eguidotti/torchabc/tree/main?tab=readme-ov-file#default-methods) (can be overridden but have defaults), and a few are [concrete](https://github.com/eguidotti/torchabc/tree/main?tab=readme-ov-file#concrete-methods) (should not be overridden).
-
----
-
-## Abstract Methods
-
-| Method                                 | Description                                                                                                                                                                                                                     |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dataloaders`               | Must return `dict[str, torch.utils.data.DataLoader]`. Example keys: `"train"`, `"val"`, `"test"`.                                                                                                                               |
-| `preprocess(sample, hparams, flag='')` | Transform a raw dataset sample.<br> **Parameters:**<br> - `sample` (`Any`): raw sample.<br> - `hparams` (`dict`): hyperparameters.<br> - `flag` (`str`, optional): mode flag.<br> **Returns:** `Tensor` or iterable of tensors. |
-| `collate(samples)`                     | Collate a batch of preprocessed samples.<br> **Parameters:**<br> - `samples` (`Iterable[Tensor]`)<br> **Returns:** `Tensor` or iterable of tensors.                                                                             |
-| `network`                   | Must return a `torch.nn.Module`. Inputs and outputs must use `(batch_size, ...)` format.                                                                                                                                        |
-| `optimizer`                 | Must return a `torch.optim.Optimizer` for `self.network.parameters()`.                                                                                                                                                          |
-| `loss(outputs, targets, hparams)`      | Compute loss for a batch.<br> **Parameters:**<br> - `outputs` (`Tensor` or iterable)<br> - `targets` (`Tensor` or iterable)<br> - `hparams` (`dict`)<br> **Returns:** `dict[str, Any]` containing key `"loss"`.                 |
-| `postprocess(outputs, hparams)`        | Convert network outputs into predictions.<br> **Parameters:**<br> - `outputs` (`Tensor` or iterable)<br> - `hparams` (`dict`)<br> **Returns:** predictions (`Any`).                                                             |
-
----
-
-## Default Methods
-
-| Method                             | Description                                                                                                                                                                                                                                                         |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scheduler`             | Learning rate scheduler. May return `None`, `torch.optim.lr_scheduler.LRScheduler`, or `ReduceLROnPlateau`. Default is `None`.                                                                                                                                      |
-| `backward(batch, gas)`             | Backpropagation step.<br> **Parameters:**<br> - `batch` (`dict[str, Any]`): must contain key `"loss"`.<br> - `gas` (`int`): gradient accumulation steps.                                                                                                                |
-| `metrics(batches, hparams)`        | Compute evaluation metrics.<br> **Parameters:**<br> - `batches` (`deque[dict[str, Any]]`): batch results.<br> - `hparams` (`dict`)<br> **Returns:** `dict[str, Any]`. Default computes average loss.                                                                |
-| `checkpoint(epoch, metrics, out)` | Checkpoint step. Saves model if loss improves.<br> **Parameters:**<br> - `epoch` (`int`): epoch number.<br> - `metrics` (`dict[str, float]`): validation metrics.<br> - `out` (`str` or `None`): output path to save checkpoints.<br> **Returns:** `bool` indicating early stopping.|
-| `move(data)`                       | Move data to current device. Supports `Tensor`, list, tuple, dict.                                                                                                                                                                                                  |
-| `detach(data)`                     | Detach data from computation graph. Supports `Tensor`, list, tuple, dict.                                                                                                                                                                                           |
-
----
-
-## Concrete Methods
-
-| Method                                                                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TorchABC(device=None, logger=print, hparams=None, **kwargs)` | Initialize the model.<br> **Parameters:**<br> - `device` (`str` or `torch.device`, optional): computation device. Defaults to CUDA if available, otherwise MPS or CPU.<br> - `logger` (`Callable[[dict], None]`, optional): logging function. Defaults to `print`.<br> - `hparams` (`dict`, optional): dictionary of hyperparameters.<br> - `kwargs`: additional attributes stored in the instance. |
-| `train(epochs, gas=1, mas=None, on='train', val='val', out=None)` | Train the model.<br> **Parameters:**<br> - `epochs` (`int`): number of training epochs.<br> - `gas` (`int`, optional): gradient accumulation steps. Defaults to 1.<br> - `mas` (`int`, optional): metrics accumulation steps. Defaults to `gas`.<br> - `on` (`str`, optional): training dataloader name. Default `"train"`.<br> - `val` (`str`, optional): validation dataloader name. Default `"val"`. If `None`, validation is skipped.<br> - `out` (`str`, optional): output path to save checkpoints. |
-| `eval(on)`                                                               | Evaluate the model.<br> **Parameters:**<br> - `on` (`str`): dataloader name.<br> **Returns:** `dict[str, float]` of evaluation metrics.                                                                                                                                                                                                                                                                                                                                                                                           |
-| `__call__(samples)`                                                      | Run inference on raw samples.<br> **Parameters:**<br> - `samples` (`Iterable[Any]`): raw samples.<br> **Returns:** postprocessed predictions.                                                                                                                                                                                                                                                                                                                                                                                     |
-| `save(path)`                                                             | Save a checkpoint.<br> **Parameters:**<br> - `path` (`str`): file path.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `load(path)`                                                             | Load a checkpoint.<br> **Parameters:**<br> - `path` (`str`): file path.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-
----
 
 ## Examples
 

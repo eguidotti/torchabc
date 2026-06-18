@@ -87,6 +87,10 @@ class MNISTClassifier(TorchABC):
     def optimizer(self):
         return torch.optim.Adam(self.network.parameters(), lr=self.hparams['optimizer']['lr'])
 
+    @cached_property
+    def scheduler(self):
+        return None
+    
     @staticmethod
     def loss(outputs, targets, hparams):
         return {
@@ -96,23 +100,23 @@ class MNISTClassifier(TorchABC):
         }
 
     @staticmethod
-    def metrics(batches, hparams):
-        loss = torch.stack([batch['loss'] for batch in batches])
-        y_pred = torch.cat([batch['y_pred'] for batch in batches])
-        y_true = torch.cat([batch['y_true'] for batch in batches])
+    def metrics(losses, hparams):
+        loss = torch.stack([loss['loss'] for loss in losses])
+        y_pred = torch.cat([loss['y_pred'] for loss in losses])
+        y_true = torch.cat([loss['y_true'] for loss in losses])
         return {
             "loss": loss.mean().item(),
             "accuracy": (y_pred == y_true).float().mean().item(),
         }
                 
+    @staticmethod
+    def postprocess(outputs, hparams):
+        return torch.argmax(outputs, dim=1).cpu().numpy().tolist()
+
     def checkpoint(self, epoch, metrics, out):
         if epoch == 1 or metrics["accuracy"] > self.best_accuracy:
             self.best_accuracy = metrics["accuracy"]
             self.save(out)
-
-    @staticmethod
-    def postprocess(outputs, hparams):
-        return torch.argmax(outputs, dim=1).cpu().numpy().tolist()
 
 
 if __name__ == "__main__":
