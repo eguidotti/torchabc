@@ -57,8 +57,15 @@ class MyModel(TorchABC):"""
     """
 
     for name in (
-        'dataloaders', 'preprocess', 'collate', 'network', 
-        'optimizer', 'scheduler', 'loss', 'metrics', 'postprocess'
+        'dataloaders', 
+        'preprocess', 
+        'collate', 
+        'network', 
+        'loss',
+        'optimizer', 
+        'scheduler', 
+        'metrics', 
+        'postprocess'
     ):
         if name in cached_properties:
             doc = cached_properties[name]

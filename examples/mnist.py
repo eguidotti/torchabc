@@ -83,14 +83,6 @@ class MNISTClassifier(TorchABC):
             
         return SimpleCNN(self.hparams)
 
-    @cached_property
-    def optimizer(self):
-        return torch.optim.Adam(self.network.parameters(), lr=self.hparams['optimizer']['lr'])
-
-    @cached_property
-    def scheduler(self):
-        return None
-    
     @staticmethod
     def loss(outputs, targets, hparams):
         return {
@@ -99,6 +91,14 @@ class MNISTClassifier(TorchABC):
             "y_true": targets,
         }
 
+    @cached_property
+    def optimizer(self):
+        return torch.optim.Adam(self.network.parameters(), lr=self.hparams['optimizer']['lr'])
+
+    @cached_property
+    def scheduler(self):
+        return None
+    
     @staticmethod
     def metrics(losses, hparams):
         loss = torch.stack([loss['loss'] for loss in losses])

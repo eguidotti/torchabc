@@ -12,13 +12,15 @@ The `TorchABC` class structures a project into the following main steps:
 
 ![diagram](https://github.com/user-attachments/assets/dd5abbb4-c28b-4477-a196-6eef5ad2ec2e)
 
-1. **Dataloaders** - load raw data samples.
-2. **Preprocess** – transform raw samples.
+1. **Dataloaders** - load raw data.
+2. **Preprocess** – transform raw data into preprocessed samples.
 3. **Collate** - batch preprocessed samples.
-4. **Network** - compute model outputs.
-5. **Loss** - compute error against targets.
-6. **Optimizer** - update model parameters.
-7. **Postprocess** - transform outputs into predictions.
+4. **Network** - compute the model's outputs for a single batch.
+5. **Loss** - compute the loss for a single batch.
+6. **Optimizer** - update the model's parameters.
+7. **Scheduler** - update the optimizer's parameters.
+8. **Metrics** - compute evaluation metrics from multiple batches.
+9. **Postprocess** - transform outputs into predictions.
 
 Each step corresponds to an abstract method in `TorchABC`. To use `TorchABC`, create a concrete subclass and implement these methods.
 
@@ -68,6 +70,14 @@ class MyModel(TorchABC):
     def optimizer(self):
         raise NotImplementedError
     
+    @cached_property
+    def scheduler(self):
+        return None
+    
+    @staticmethod
+    def metrics(losses, hparams):
+        return {"loss": sum(loss["loss"] for loss in losses) / len(losses)}
+
     @staticmethod
     def postprocess(outputs, hparams):
         return outputs
@@ -158,25 +168,6 @@ class MyModel(TorchABC):
         """
         raise NotImplementedError
     
-    @cached_property
-    def optimizer(self):
-        """The optimizer for training the network.
-
-        Return a `torch.optim.Optimizer` configured for 
-        `self.network.parameters()`.
-        """
-        raise NotImplementedError
-    
-    @cached_property
-    def scheduler(self):
-        """The learning rate scheduler for the optimizer.
-
-        Return a `torch.optim.lr_scheduler.LRScheduler` or 
-        `torch.optim.lr_scheduler.ReduceLROnPlateau` configured 
-        for `self.optimizer`.
-        """
-        return None
-    
     @staticmethod
     def loss(outputs, targets, hparams):
         """The loss function.
@@ -200,6 +191,25 @@ class MyModel(TorchABC):
         """
         raise NotImplementedError
 
+    @cached_property
+    def optimizer(self):
+        """The optimizer for training the network.
+
+        Return a `torch.optim.Optimizer` configured for 
+        `self.network.parameters()`.
+        """
+        raise NotImplementedError
+    
+    @cached_property
+    def scheduler(self):
+        """The learning rate scheduler for the optimizer.
+
+        Return a `torch.optim.lr_scheduler.LRScheduler` or 
+        `torch.optim.lr_scheduler.ReduceLROnPlateau` configured 
+        for `self.optimizer`.
+        """
+        return None
+    
     @staticmethod
     def metrics(losses, hparams):
         """The evaluation metrics.
@@ -237,6 +247,7 @@ class MyModel(TorchABC):
             The postprocessed predictions.
         """
         return outputs
+
 ```
 
 ## Usage
