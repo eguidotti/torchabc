@@ -8,7 +8,7 @@ This package has no extra dependencies beyond PyTorch and it consists of a simpl
 
 ## Structure
 
-The [`TorchABC`](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py)` class structures a project into the following main steps:
+The [`TorchABC`](https://github.com/eguidotti/torchabc/blob/main/torchabc/__init__.py) class structures a project into the following main steps:
 
 ![diagram](https://github.com/user-attachments/assets/dd5abbb4-c28b-4477-a196-6eef5ad2ec2e)
 
