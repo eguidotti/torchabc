@@ -113,11 +113,6 @@ class MNISTClassifier(TorchABC):
     def postprocess(outputs, hparams):
         return torch.argmax(outputs, dim=1).cpu().numpy().tolist()
 
-    def checkpoint(self, epoch, metrics, out):
-        if epoch == 1 or metrics["accuracy"] > self.best_accuracy:
-            self.best_accuracy = metrics["accuracy"]
-            self.save(out)
-
 
 if __name__ == "__main__":
 

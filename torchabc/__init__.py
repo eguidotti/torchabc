@@ -43,6 +43,7 @@ class TorchABC(abc.ABC):
         self.logger = logger
         self.hparams = hparams.copy() if hparams else {}
         self.__dict__.update(kwargs)
+        self.state = {}
 
     def train(self, epochs: int, gas: int = 1, mas: int = None, 
               on: str = 'train', val: str = 'val', out: str = None) -> None:
@@ -110,7 +111,7 @@ class TorchABC(abc.ABC):
                     val_log.update({"lr": self.scheduler.get_last_lr()})
             if val:
                 self.logger({val + "/" + k: v for k, v in val_log.items()})
-            if self.checkpoint(epoch, val_metrics if val else {}, out):
+            if self.checkpoint(val_metrics if val else {}, out):
                 break
 
     def eval(self, on: str) -> dict[str, float]:
@@ -306,15 +307,13 @@ class TorchABC(abc.ABC):
         """
         pass
 
-    def checkpoint(self, epoch: int, metrics: dict[str, Any], out: str):
+    def checkpoint(self, metrics: dict[str, Any], out: str):
         """The checkpointing step.
 
         Perform checkpointing at the end of each epoch.
 
         Parameters
         ----------
-        epoch : int
-            The epoch number, starting at 1.
         metrics : dict[str, float]
             The dictionary of validation metrics.
         out : str
@@ -325,8 +324,10 @@ class TorchABC(abc.ABC):
         bool
             If this function returns True, training stops.
         """
-        if epoch == 1 or metrics["loss"] < self.min_loss:
-            self.min_loss = metrics["loss"]
+        self.state["epoch"] = self.state.get("epoch", 0) + 1
+        min_loss = self.state.get("min_loss")
+        if min_loss is None or min_loss > metrics["loss"]:
+            self.state["min_loss"] = metrics["loss"]
             if out is not None:
                 self.save(out)
         return False
@@ -409,6 +410,7 @@ class TorchABC(abc.ABC):
             The path where to save the checkpoint.
         """
         torch.save({
+            'state': self.state,
             'network_state_dict': self.network.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
@@ -423,6 +425,7 @@ class TorchABC(abc.ABC):
             The path of the checkpoint.
         """
         checkpoint = torch.load(checkpoint, map_location='cpu')
+        self.state = checkpoint['state']
         self.network.load_state_dict(checkpoint['network_state_dict'])
         self.network.to(self.device)
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
